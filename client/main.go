@@ -24,7 +24,17 @@ func run() error {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-echo-example"},
 	}
-	session, err := quic.DialAddr(addr, tlsConf, nil)
+	max := uint64(1 << 60)
+	session, err := quic.DialAddr(
+		addr,
+		tlsConf,
+		&quic.Config{
+			MaxIncomingStreams:                    int64(max),
+			MaxIncomingUniStreams:                 int64(max),
+			MaxReceiveStreamFlowControlWindow:     max,
+			MaxReceiveConnectionFlowControlWindow: max,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -43,7 +53,7 @@ func run() error {
 
 	pipeline := gstsink.CreatePipeline()
 
-	buf := make([]byte, 10240)
+	//buf := make([]byte, 10240)
 	for {
 
 		stream, err := session.AcceptStream(context.Background())
@@ -51,14 +61,15 @@ func run() error {
 			return err
 		}
 
-		n, err := stream.Read(buf)
+		_, err = io.Copy(pipeline, stream)
+		//n, err := stream.Read(buf)
 		if err != nil && err != io.EOF {
 			return err
 		}
 		//log.Printf("%v\n", string(buf[:64]))
-		_, err = pipeline.Write(buf[:n])
-		if err != nil {
-			return err
-		}
+		//_, err = pipeline.Write(buf[:n])
+		//if err != nil {
+		//	return err
+		//}
 	}
 }

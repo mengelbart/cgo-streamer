@@ -22,10 +22,14 @@ type Pipeline struct {
 	Pipeline *C.GstElement
 }
 
+var numBytes = 0
+
 func (p *Pipeline) Write(b []byte) (n int, err error) {
-	log.Printf("writing %v bytes to pipeline", len(b))
+	log.Println("trying to write bytes to pipeline")
 	bs := C.CBytes(b)
 	defer C.free(bs)
 	C.go_gst_receive_push_buffer(p.Pipeline, bs, C.int(len(b)))
+	numBytes += len(b)
+	log.Printf("%v bytes written to pipeline, total: %v", len(b), numBytes)
 	return len(b), nil
 }

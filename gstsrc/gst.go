@@ -21,20 +21,20 @@ var writer io.Writer
 
 func CreatePipeline(w io.Writer) {
 	writer = w
-	C.go_gst_create_pipeline(C.CString("videotestsrc ! video/x-raw,format=I420 ! x264enc ! video/x-h264,stream-format=byte-stream ! appsink name=appsink"))
+	C.go_gst_create_pipeline(C.CString("videotestsrc ! video/x-raw,format=I420 ! x264enc ! video/x-h264,stream-format=byte-stream ! appsink max-buffers=1 drop=TRUE name=appsink"))
 }
+
+var numBytes = 0
 
 //export goHandlePipelineBuffer
 func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int) {
+	log.Printf("trying to write bytes to buffer")
 	bs := C.GoBytes(buffer, bufferLen)
-	//if bufferLen < 100 {
-	//	log.Printf("%v\n", bs[:bufferLen])
-	//} else {
-	//	log.Printf("%v\n", bs[:64])
-	//}
 	n, err := writer.Write(bs)
 	if err != nil {
 		log.Printf("failed to n buffer to writer: %v", err)
 	}
-	log.Printf("%v bytes written to writer", n)
+	numBytes += n
+	C.free(buffer)
+	log.Printf("%v bytes written to writer, total: %v", n, numBytes)
 }

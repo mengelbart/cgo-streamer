@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/pem"
 	"log"
 	"math/big"
@@ -29,7 +31,17 @@ func serve() error {
 	if err != nil {
 		return err
 	}
-	listener, err := quic.ListenAddr(addr, tlsConfig, nil)
+	max := uint64(1 << 60)
+	listener, err := quic.ListenAddr(
+		addr,
+		tlsConfig,
+		&quic.Config{
+			MaxReceiveStreamFlowControlWindow:     max,
+			MaxReceiveConnectionFlowControlWindow: max,
+			MaxIncomingStreams:                    int64(max),
+			MaxIncomingUniStreams:                 int64(max),
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -52,16 +64,48 @@ func serve() error {
 	select {}
 }
 
+type OneStreamWriter struct {
+	session quic.Session
+	stream  quic.SendStream
+}
+
+func (o OneStreamWriter) Write(b []byte) (int, error) {
+	if o.stream == nil {
+		stream, err := o.session.OpenUniStream()
+		if err != nil {
+			return 0, err
+		}
+		o.stream = stream
+	}
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.BigEndian, len(b))
+	if err != nil {
+		return 0, err
+	}
+	buf.Write(b)
+	return o.stream.Write(buf.Bytes())
+}
+
 type SingleStreamWriter struct {
 	session quic.Session
 }
 
+var numStreams = 0
+
 func (s *SingleStreamWriter) Write(b []byte) (n int, err error) {
 	stream, err := s.session.OpenStreamSync(context.Background())
+	numStreams++
+	log.Printf("opened %v streams", numStreams)
 	if err != nil {
 		return 0, err
 	}
-	defer stream.Close()
+	defer func() {
+		err := stream.Close()
+		if err != nil {
+			log.Printf("could not close stream: %v", err)
+		}
+		log.Printf("successfully closed stream")
+	}()
 	return stream.Write(b)
 }
 

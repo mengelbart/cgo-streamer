@@ -6,7 +6,9 @@ package gstsink
 #include "gst.h"
 */
 import "C"
-import "log"
+import (
+	"log"
+)
 
 func init() {
 	go C.go_gst_start_mainloop()

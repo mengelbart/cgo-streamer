@@ -9,15 +9,25 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
 	"log"
 	"math/big"
 
 	"github.com/mengelbart/cgo-streamer/gstsrc"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/quictrace"
+	"github.com/lucas-clemente/quic-go/quictrace/pb"
 )
 
 const addr = "localhost:4242"
+
+var tracer quictrace.Tracer
+
+func init() {
+	tracer = quictrace.NewTracer()
+}
 
 func main() {
 	err := serve()
@@ -36,6 +46,7 @@ func serve() error {
 		addr,
 		tlsConfig,
 		&quic.Config{
+			QuicTracer:                            tracer,
 			MaxReceiveStreamFlowControlWindow:     max,
 			MaxReceiveConnectionFlowControlWindow: max,
 			MaxIncomingStreams:                    int64(max),
@@ -92,7 +103,7 @@ type SingleStreamWriter struct {
 
 var numStreams = 0
 
-func (s *SingleStreamWriter) Write(b []byte) (n int, err error) {
+func (s *SingleStreamWriter) Write(b []byte) (int, error) {
 	stream, err := s.session.OpenStreamSync(context.Background())
 	numStreams++
 	log.Printf("opened %v streams", numStreams)
@@ -106,7 +117,26 @@ func (s *SingleStreamWriter) Write(b []byte) (n int, err error) {
 		}
 		log.Printf("successfully closed stream")
 	}()
-	return stream.Write(b)
+	n, err := stream.Write(b)
+	if err != nil {
+		return 0, err
+	}
+	traces := tracer.GetAllTraces()
+	if len(traces) != 1 {
+		return 0, errors.New("expected excatly 1 trace")
+	}
+	for _, trace := range traces {
+		tracePB := &pb.Trace{}
+		err := proto.Unmarshal(trace, tracePB)
+		if err != nil {
+			return 0, err
+		}
+		for _, e := range tracePB.Events {
+			log.Println(e.TransportState)
+		}
+	}
+
+	return n, nil
 }
 
 func generateTLSConfig() (*tls.Config, error) {

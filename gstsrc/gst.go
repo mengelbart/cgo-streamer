@@ -21,7 +21,8 @@ var writer io.Writer
 
 func CreatePipeline(w io.Writer) {
 	writer = w
-	C.go_gst_create_pipeline(C.CString("videotestsrc ! video/x-raw,format=I420 ! x264enc ! video/x-h264,stream-format=byte-stream ! appsink max-buffers=1 drop=TRUE name=appsink"))
+	//C.go_gst_create_pipeline(C.CString("videotestsrc ! video/x-raw,format=I420 ! x264enc ! video/x-h264,stream-format=byte-stream ! appsink max-buffers=1 drop=TRUE name=appsink"))
+	C.go_gst_create_pipeline(C.CString("videotestsrc ! video/x-raw,format=I420 ! x264enc ! video/x-h264,stream-format=byte-stream ! appsink name=appsink"))
 }
 
 var numBytes = 0

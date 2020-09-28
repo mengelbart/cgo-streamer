@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"bytes"
@@ -7,33 +7,33 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/binary"
 	"encoding/pem"
-	"errors"
+	"fmt"
+	"io"
 	"log"
 	"math/big"
+	"sync"
 
-	"github.com/mengelbart/cgo-streamer/gstsrc"
-
-	"github.com/golang/protobuf/proto"
-	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/quictrace"
-	"github.com/lucas-clemente/quic-go/quictrace/pb"
-)
 
-const addr = "localhost:4242"
+	"github.com/lucas-clemente/quic-go"
+	"github.com/mengelbart/cgo-streamer/gst"
+	"github.com/pion/rtp"
+
+	"github.com/spf13/cobra"
+)
 
 var tracer quictrace.Tracer
 
 func init() {
-	tracer = quictrace.NewTracer()
+	rootCmd.AddCommand(serveCmd)
 }
 
-func main() {
-	err := serve()
-	if err != nil {
-		panic(err)
-	}
+var serveCmd = &cobra.Command{
+	Use: "serve",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return serve()
+	},
 }
 
 func serve() error {
@@ -68,8 +68,10 @@ func serve() error {
 
 	log.Println("accepted stream, creating pipeline")
 
-	gstsrc.CreatePipeline(&SingleStreamWriter{
+	gst.StartMainLoop()
+	gst.CreateSrcPipeline(&SingleStreamWriter{
 		session: sess,
+		//init:    sync.Once{},
 	})
 
 	select {}
@@ -78,35 +80,27 @@ func serve() error {
 type OneStreamWriter struct {
 	session quic.Session
 	stream  quic.SendStream
+	init    sync.Once
 }
 
-func (o OneStreamWriter) Write(b []byte) (int, error) {
-	if o.stream == nil {
-		stream, err := o.session.OpenUniStream()
+func (o *OneStreamWriter) Write(b []byte) (int, error) {
+	o.init.Do(func() {
+		stream, err := o.session.OpenStreamSync(context.Background())
 		if err != nil {
-			return 0, err
+			panic(err)
 		}
 		o.stream = stream
-	}
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, len(b))
-	if err != nil {
-		return 0, err
-	}
-	buf.Write(b)
-	return o.stream.Write(buf.Bytes())
+	})
+	log.Printf("writing %v bytes to pipeline", len(b))
+	return o.stream.Write(b)
 }
 
 type SingleStreamWriter struct {
 	session quic.Session
 }
 
-var numStreams = 0
-
 func (s *SingleStreamWriter) Write(b []byte) (int, error) {
 	stream, err := s.session.OpenStreamSync(context.Background())
-	numStreams++
-	log.Printf("opened %v streams", numStreams)
 	if err != nil {
 		return 0, err
 	}
@@ -115,28 +109,34 @@ func (s *SingleStreamWriter) Write(b []byte) (int, error) {
 		if err != nil {
 			log.Printf("could not close stream: %v", err)
 		}
-		log.Printf("successfully closed stream")
 	}()
-	n, err := stream.Write(b)
+	p := &rtp.Packet{}
+	err = p.Unmarshal(b)
 	if err != nil {
+		panic(err)
+	}
+	fmt.Println(p)
+	n, err := io.Copy(stream, bytes.NewBuffer(b))
+	if err != nil {
+		panic(err)
 		return 0, err
 	}
-	traces := tracer.GetAllTraces()
-	if len(traces) != 1 {
-		return 0, errors.New("expected excatly 1 trace")
-	}
-	for _, trace := range traces {
-		tracePB := &pb.Trace{}
-		err := proto.Unmarshal(trace, tracePB)
-		if err != nil {
-			return 0, err
-		}
-		for _, e := range tracePB.Events {
-			log.Println(e.TransportState)
-		}
-	}
+	//traces := tracer.GetAllTraces()
+	//if len(traces) != 1 {
+	//	return 0, errors.New("expected excatly 1 trace")
+	//}
+	//for _, trace := range traces {
+	//	tracePB := &pb.Trace{}
+	//	err := proto.Unmarshal(trace, tracePB)
+	//	if err != nil {
+	//		return 0, err
+	//	}
+	//	for _, e := range tracePB.Events {
+	//		log.Println(e.TransportState)
+	//	}
+	//}
 
-	return n, nil
+	return int(n), nil
 }
 
 func generateTLSConfig() (*tls.Config, error) {

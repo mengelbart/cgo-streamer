@@ -1,23 +1,34 @@
-package main
+package cmd
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 
+	"github.com/mengelbart/cgo-streamer/gst"
+
 	"github.com/lucas-clemente/quic-go"
-	"github.com/mengelbart/cgo-streamer/gstsink"
+	"github.com/pion/rtp"
+
+	"github.com/spf13/cobra"
 )
 
-const addr = "localhost:4242"
-
-func main() {
-	err := run()
-	if err != nil {
-		panic(err)
-	}
+func init() {
+	rootCmd.AddCommand(clientCmd)
 }
+
+var clientCmd = &cobra.Command{
+	Use: "stream",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return run()
+	},
+}
+
+const addr = "localhost:4242"
 
 func run() error {
 	tlsConf := &tls.Config{
@@ -51,7 +62,27 @@ func run() error {
 
 	log.Println("opened stream, creating pipeline")
 
-	pipeline := gstsink.CreatePipeline()
+	gst.StartMainLoop()
+	pipeline := gst.CreateSinkPipeline()
+
+	//stream, err = session.AcceptStream(context.Background())
+	//if err != nil {
+	//	return err
+	//}
+	//buf := make([]byte, 1500)
+	//var n int
+	//for err != io.EOF {
+	//	n, err = stream.Read(buf)
+	//	if err != nil && err != io.EOF {
+	//		return err
+	//	}
+	//	log.Printf("read %v bytes from stream", n)
+	//	_, err = pipeline.Write(buf[:n])
+	//	if err != nil && err != io.EOF {
+	//		return err
+	//	}
+	//}
+	//return nil
 
 	//buf := make([]byte, 10240)
 	for {
@@ -61,7 +92,16 @@ func run() error {
 			return err
 		}
 
-		_, err = io.Copy(pipeline, stream)
+		bs, err := ioutil.ReadAll(stream)
+		packet := &rtp.Packet{}
+		err = packet.Unmarshal(bs)
+		if err != nil {
+			panic(err)
+			//return 0, err
+		}
+		fmt.Println(packet)
+
+		_, err = io.Copy(pipeline, bytes.NewReader(bs))
 		//n, err := stream.Read(buf)
 		if err != nil && err != io.EOF {
 			return err

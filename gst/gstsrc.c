@@ -1,11 +1,4 @@
-#include "gst.h"
-
-GMainLoop *go_gst_main_loop = NULL;
-void go_gst_start_mainloop(void) {
-    go_gst_main_loop = g_main_loop_new(NULL, FALSE);
-
-    g_main_loop_run(go_gst_main_loop);
-}
+#include "gstsrc.h"
 
 static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     switch (GST_MESSAGE_TYPE(msg)) {
@@ -55,7 +48,7 @@ GstFlowReturn go_gst_send_new_sample_handler(GstElement *object, gpointer user_d
     return GST_FLOW_OK;
 }
 
-void go_gst_create_pipeline(char *pipelineStr) {
+void go_gst_create_src_pipeline(char *pipelineStr) {
     GError *error = NULL;
     GstElement *pipeline;
 

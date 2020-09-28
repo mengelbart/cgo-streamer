@@ -1,13 +1,6 @@
-#include "gst.h"
+#include "gstsink.h"
 
 #include <gst/app/gstappsrc.h>
-
-GMainLoop *go_gst_main_loop = NULL;
-void go_gst_start_mainloop(void) {
-    go_gst_main_loop = g_main_loop_new(NULL, FALSE);
-
-    g_main_loop_run(go_gst_main_loop);
-}
 
 static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     switch (GST_MESSAGE_TYPE(msg)) {
@@ -36,7 +29,7 @@ static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     return TRUE;
 }
 
-GstElement *go_gst_create_pipeline(char *pipelineStr) {
+GstElement *go_gst_create_sink_pipeline(char *pipelineStr) {
     GError *error = NULL;
     GstElement *pipeline;
 

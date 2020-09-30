@@ -84,13 +84,17 @@ type OneStreamWriter struct {
 }
 
 func (o *OneStreamWriter) Write(b []byte) (int, error) {
+	var err error
 	o.init.Do(func() {
-		stream, err := o.session.OpenStreamSync(context.Background())
-		if err != nil {
-			panic(err)
+		stream, e := o.session.OpenStreamSync(context.Background())
+		if e != nil {
+			err = e
 		}
 		o.stream = stream
 	})
+	if err != nil {
+		return 0, err
+	}
 	log.Printf("writing %v bytes to pipeline", len(b))
 	return o.stream.Write(b)
 }
@@ -113,12 +117,11 @@ func (s *SingleStreamWriter) Write(b []byte) (int, error) {
 	p := &rtp.Packet{}
 	err = p.Unmarshal(b)
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	fmt.Println(p)
 	n, err := io.Copy(stream, bytes.NewBuffer(b))
 	if err != nil {
-		panic(err)
 		return 0, err
 	}
 	//traces := tracer.GetAllTraces()

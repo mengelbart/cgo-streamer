@@ -65,26 +65,6 @@ func run() error {
 	gst.StartMainLoop()
 	pipeline := gst.CreateSinkPipeline()
 
-	//stream, err = session.AcceptStream(context.Background())
-	//if err != nil {
-	//	return err
-	//}
-	//buf := make([]byte, 1500)
-	//var n int
-	//for err != io.EOF {
-	//	n, err = stream.Read(buf)
-	//	if err != nil && err != io.EOF {
-	//		return err
-	//	}
-	//	log.Printf("read %v bytes from stream", n)
-	//	_, err = pipeline.Write(buf[:n])
-	//	if err != nil && err != io.EOF {
-	//		return err
-	//	}
-	//}
-	//return nil
-
-	//buf := make([]byte, 10240)
 	for {
 
 		stream, err := session.AcceptStream(context.Background())
@@ -96,20 +76,13 @@ func run() error {
 		packet := &rtp.Packet{}
 		err = packet.Unmarshal(bs)
 		if err != nil {
-			panic(err)
-			//return 0, err
+			return err
 		}
 		fmt.Println(packet)
 
 		_, err = io.Copy(pipeline, bytes.NewReader(bs))
-		//n, err := stream.Read(buf)
 		if err != nil && err != io.EOF {
 			return err
 		}
-		//log.Printf("%v\n", string(buf[:64]))
-		//_, err = pipeline.Write(buf[:n])
-		//if err != nil {
-		//	return err
-		//}
 	}
 }

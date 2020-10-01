@@ -13,15 +13,14 @@ import (
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/pion/rtp"
-
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	rootCmd.AddCommand(clientCmd)
+	rootCmd.AddCommand(streamCmd)
 }
 
-var clientCmd = &cobra.Command{
+var streamCmd = &cobra.Command{
 	Use: "stream",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return run()

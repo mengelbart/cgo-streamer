@@ -1,30 +1,45 @@
-package quic
+package transport
 
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/mengelbart/cgo-streamer/gst"
-	"github.com/pion/rtp"
 )
 
+type SrcFactory interface {
+	MakeSrc(writer io.Writer) func()
+	FeedbackChan() chan []byte
+}
+
 type ManyStreamsHandlerThing struct {
-	close chan struct{}
+	Close    chan struct{}
+	src      SrcFactory
+	feedback chan []byte
+}
+
+func NewManyStreamsHandlerThing(src SrcFactory) *ManyStreamsHandlerThing {
+	return &ManyStreamsHandlerThing{
+		Close:    make(chan struct{}, 1),
+		src:      src,
+		feedback: src.FeedbackChan(),
+	}
 }
 
 func (m *ManyStreamsHandlerThing) handle(sess quic.Session) error {
 	errChan := make(chan error, 1)
-	gst.CreateSrcPipeline(&ManyStreamWriterThing{
-		session: sess,
-		err:     errChan,
+	cancel := m.src.MakeSrc(&ManyStreamWriterThing{
+		session:  sess,
+		err:      errChan,
+		feedback: m.feedback,
 	})
+	defer cancel()
 	select {
-	case <-m.close:
+	case <-m.Close:
 		return nil
 	case err := <-errChan:
 		return err
@@ -32,8 +47,25 @@ func (m *ManyStreamsHandlerThing) handle(sess quic.Session) error {
 }
 
 type ManyStreamWriterThing struct {
-	session quic.Session
-	err     chan error
+	session  quic.Session
+	err      chan error
+	feedback chan []byte
+}
+
+func (m *ManyStreamWriterThing) AcceptFeedback() error {
+	fbStream, err := m.session.AcceptUniStream(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for {
+		fb, err := ioutil.ReadAll(fbStream)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		m.feedback <- fb
+	}
 }
 
 func (m *ManyStreamWriterThing) Write(b []byte) (int, error) {
@@ -41,21 +73,16 @@ func (m *ManyStreamWriterThing) Write(b []byte) (int, error) {
 	if err != nil {
 		log.Println("could not open stream, closing session")
 		m.err <- err
+		return 0, err
 	}
 	defer func() {
 		if stream != nil {
 			err := stream.Close()
 			if err != nil {
-				log.Printf("could not close stream: %v", err)
+				log.Printf("could not Close stream: %v", err)
 			}
 		}
 	}()
-	p := &rtp.Packet{}
-	err = p.Unmarshal(b)
-	if err != nil {
-		return 0, err
-	}
-	fmt.Println(p)
 
 	n, err := io.Copy(stream, bytes.NewBuffer(b))
 	if err != nil {

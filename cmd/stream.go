@@ -32,7 +32,7 @@ const addr = "localhost:4242"
 func run() error {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-echo-example"},
+		NextProtos:         []string{"quic-realtime"},
 	}
 	max := uint64(1 << 60)
 	session, err := quic.DialAddr(

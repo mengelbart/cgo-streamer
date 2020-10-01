@@ -1,4 +1,4 @@
-package quic
+package transport
 
 import (
 	"context"
@@ -134,6 +134,6 @@ func generateTLSConfig() (*tls.Config, error) {
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
-		NextProtos:   []string{"quic-echo-example"},
+		NextProtos:   []string{"quic-realtime"},
 	}, nil
 }

@@ -15,5 +15,6 @@ void go_gst_destroy_pipeline(GstElement* pipeline);
 
 unsigned int go_gst_get_ssrc(GstElement* pipeline);
 void go_gst_set_ssrc(GstElement* pipeline, unsigned int ssrc);
+void go_gst_set_bitrate(GstElement* pipeline, unsigned int bitrate);
 
 #endif

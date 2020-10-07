@@ -3,8 +3,8 @@ package transport
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 
@@ -32,11 +32,16 @@ func NewManyStreamsHandlerThing(src SrcFactory) *ManyStreamsHandlerThing {
 
 func (m *ManyStreamsHandlerThing) handle(sess quic.Session) error {
 	errChan := make(chan error, 1)
-	cancel := m.src.MakeSrc(&ManyStreamWriterThing{
+	handler := &ManyStreamWriterThing{
 		session:  sess,
 		err:      errChan,
 		feedback: m.feedback,
-	})
+	}
+	go func() {
+		err := handler.AcceptFeedback()
+		errChan <- err
+	}()
+	cancel := m.src.MakeSrc(handler)
 	defer cancel()
 	select {
 	case <-m.Close:
@@ -57,12 +62,22 @@ func (m *ManyStreamWriterThing) AcceptFeedback() error {
 	if err != nil {
 		return err
 	}
-
+	log.Println("accepted feedback stream")
 	for {
-		fb, err := ioutil.ReadAll(fbStream)
+		var size int32
+		err := binary.Read(fbStream, binary.BigEndian, &size)
 		if err != nil {
 			log.Println(err)
 			continue
+		}
+		fb := make([]byte, size)
+		n, err := fbStream.Read(fb)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		if n != int(size) {
+			log.Printf("got announcement of size %v feedback, but read only %v bytes", size, n)
 		}
 		m.feedback <- fb
 	}

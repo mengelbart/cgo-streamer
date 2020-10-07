@@ -32,7 +32,7 @@ func NewSrcPipeline(w io.Writer) *SrcPipeline {
 	nextPipelineID++
 	sp := &SrcPipeline{
 		id:       id,
-		pipeline: C.go_gst_create_src_pipeline(C.CString("videotestsrc ! x264enc ! rtph264pay name=rtph264pay ! appsink name=appsink")),
+		pipeline: C.go_gst_create_src_pipeline(C.CString("videotestsrc ! x264enc name=x264enc ! rtph264pay name=rtph264pay ! appsink name=appsink")),
 		writer:   w,
 	}
 	srcPipelines[sp.id] = sp
@@ -59,12 +59,15 @@ func (p *SrcPipeline) SetSSRC(ssrc uint) {
 	C.go_gst_set_ssrc(p.pipeline, C.uint(ssrc))
 }
 
+func (p *SrcPipeline) SetBitRate(bitrate uint) {
+	C.go_gst_set_bitrate(p.pipeline, C.uint(bitrate))
+}
+
 //export goHandlePipelineBuffer
 func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineID C.int) {
 	srcPipelinesLock.Lock()
 	srcPipeline, ok := srcPipelines[int(pipelineID)]
 	srcPipelinesLock.Unlock()
-	log.Printf("got buffer for id: %v", int(pipelineID))
 	defer C.free(buffer)
 	if !ok {
 		log.Printf("no pipeline with ID %v, discarding buffer", int(pipelineID))
@@ -79,5 +82,4 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 	if err != nil {
 		log.Printf("failed to write n bytes to writer: %v", err)
 	}
-	log.Printf("%v bytes written to network", n)
 }

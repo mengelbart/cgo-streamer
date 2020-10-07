@@ -93,3 +93,8 @@ void go_gst_set_ssrc(GstElement* pipeline, unsigned int ssrc) {
     GstElement* rtph264pay = gst_bin_get_by_name(GST_BIN(pipeline), "rtph264pay");
     g_object_set(rtph264pay, "ssrc", ssrc, NULL);
 }
+
+void go_gst_set_bitrate(GstElement* pipeline, unsigned int bitrate) {
+    GstElement* x264enc = gst_bin_get_by_name(GST_BIN(pipeline), "x264enc");
+    g_object_set(x264enc, "bitrate", bitrate, NULL);
+}

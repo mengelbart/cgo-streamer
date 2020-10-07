@@ -11,9 +11,16 @@ func (q *Queue) Push(p *rtp.Packet) {
 }
 
 func (q *Queue) Pop() *rtp.Packet {
+	if len(q.q) <= 0 {
+		return nil
+	}
 	p := q.q[0]
 	q.q = q.q[1:]
 	return p
+}
+
+func (q *Queue) Len() int {
+	return len(q.q)
 }
 
 func (q *Queue) Clear() {
@@ -21,10 +28,16 @@ func (q *Queue) Clear() {
 }
 
 func (q *Queue) SizeOfNextRTP() int {
+	if len(q.q) <= 0 {
+		return 0
+	}
 	return len(q.q[0].Raw)
 }
 
 func (q *Queue) SeqNrOfNextRTP() int {
+	if len(q.q) <= 0 {
+		return 0
+	}
 	return int(q.q[0].SequenceNumber)
 }
 
@@ -41,9 +54,13 @@ func (q *Queue) SizeOfQueue() int {
 }
 
 func (q *Queue) GetDelay(f float64) float64 {
-	panic("implement me")
+	if len(q.q) <= 0 {
+		return 0
+	}
+	return float64(q.q[0].Timestamp)
 }
 
+// TODO: Which frame?
 func (q *Queue) GetSizeOfLastFrame() int {
-	panic("implement me")
+	return 0
 }

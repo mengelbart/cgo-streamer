@@ -25,8 +25,11 @@ var serveCmd = &cobra.Command{
 }
 
 func serve() error {
-	src := &Src{}
-	src.logRTP()
+	src := &Src{
+		scream:   true,
+		feedback: make(chan []byte, 1024),
+	}
+	//src.logRTP()
 
 	s, err := transport.NewServer(
 		"localhost:4242",
@@ -40,6 +43,7 @@ func serve() error {
 }
 
 type Src struct {
+	scream   bool
 	writers  []io.Writer
 	feedback chan []byte
 }
@@ -49,6 +53,13 @@ func (s *Src) logRTP() {
 }
 
 func (s *Src) MakeSrc(w io.Writer) func() {
+	if s.scream {
+		return s.MakeScreamSrc(w)
+	}
+	return s.MakeSimpleSrc(w)
+}
+
+func (s *Src) MakeSimpleSrc(w io.Writer) func() {
 
 	mw := io.MultiWriter(append(s.writers, w)...)
 	p := gst.NewSrcPipeline(mw)
@@ -72,13 +83,15 @@ func (s *Src) FeedbackChan() chan []byte {
 }
 
 func (s *Src) MakeScreamSrc(w io.Writer) func() {
+	mw := io.MultiWriter(append(s.writers, w)...)
 	ssrc := uint(1)
-	cc := packet.NewScreamWriter(ssrc, w, s.FeedbackChan())
+	cc := packet.NewScreamWriter(ssrc, mw, s.FeedbackChan())
 
 	p := gst.NewSrcPipeline(cc)
 	p.SetSSRC(ssrc)
 	p.Start()
 	go cc.Run()
+	go cc.RunBitrate(make(chan struct{}, 1), p.SetBitRate)
 
 	return func() {
 		p.Stop()

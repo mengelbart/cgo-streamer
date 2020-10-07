@@ -28,6 +28,7 @@ func NewScreamWriter(ssrc uint, w io.Writer, fb chan []byte) *ScreamWriter {
 		q:        queue,
 		screamTx: screamTx,
 		ssrc:     ssrc,
+		packet:   make(chan *rtp.Packet, 1024),
 		feedback: fb,
 	}
 }
@@ -40,6 +41,21 @@ func (s *ScreamWriter) Write(b []byte) (int, error) {
 	}
 	s.packet <- packet
 	return len(b), nil
+}
+
+func (s ScreamWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	for {
+		select {
+		case <-ticker.C:
+			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
+			setBitrate(uint(kbps))
+			log.Printf("set bitrate to %v kbps", kbps)
+		case <-done:
+			return
+		}
+
+	}
 }
 
 func (s *ScreamWriter) Run() {
@@ -55,6 +71,11 @@ func (s *ScreamWriter) Run() {
 			}
 
 		case fb := <-s.feedback:
+			fbPacket := &CCFeedback{}
+			err := fbPacket.UnmarshalBinary(fb)
+			if err != nil {
+				log.Println(err)
+			}
 			s.screamTx.IncomingStandardizedFeedback(uint(time.Now().UTC().Unix()), fb)
 			if running {
 				continue
@@ -66,14 +87,19 @@ func (s *ScreamWriter) Run() {
 
 		dT := s.screamTx.IsOkToTransmit(uint(time.Now().UTC().Unix()), s.ssrc)
 		if dT == -1 {
+			log.Println("send window full, waiting")
 			continue
 		}
 		if dT > 0.001 {
 			running = true
+			log.Printf("waiting for send: %v", dT)
 			timer = time.NewTimer(time.Duration(dT))
 			continue
 		}
 		packet := s.q.Pop()
+		if packet == nil {
+			continue
+		}
 		bs, err := packet.Marshal()
 		if err != nil {
 			log.Println(err)
@@ -82,7 +108,7 @@ func (s *ScreamWriter) Run() {
 		if err != nil {
 			log.Println(err)
 		}
-		log.Printf("packet of %v bytes written from scream queue", n)
+		log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
 		dT = s.screamTx.AddTransmitted(
 			uint(time.Now().UTC().Unix()),
 			uint(packet.SSRC),
@@ -91,6 +117,7 @@ func (s *ScreamWriter) Run() {
 			packet.Marker,
 		)
 		if dT == -1 {
+			log.Println("send window full, waiting")
 			continue
 		}
 

@@ -32,7 +32,7 @@ func NewSrcPipeline(w io.Writer) *SrcPipeline {
 	nextPipelineID++
 	sp := &SrcPipeline{
 		id:       id,
-		pipeline: C.go_gst_create_src_pipeline(C.CString("videotestsrc ! x264enc name=x264enc ! rtph264pay name=rtph264pay ! appsink name=appsink")),
+		pipeline: C.go_gst_create_src_pipeline(C.CString("videotestsrc ! x264enc name=x264enc ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink")),
 		writer:   w,
 	}
 	srcPipelines[sp.id] = sp
@@ -80,6 +80,6 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 		log.Printf("different buffer size written: %v vs. %v", n, bufferLen)
 	}
 	if err != nil {
-		log.Printf("failed to write n bytes to writer: %v", err)
+		log.Printf("failed to write %v bytes to writer: %v", n, err)
 	}
 }

@@ -7,6 +7,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Scream bool
+
+func init() {
+	rootCmd.PersistentFlags().BoolVarP(&Scream, "scream", "s", false, "Use scream congestion control")
+}
+
 var rootCmd = &cobra.Command{
 	Use: "qst",
 }

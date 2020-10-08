@@ -13,8 +13,15 @@ import (
 
 var tracer quictrace.Tracer
 
+var LogRTP bool
+var Handler string
+var Addr string
+
 func init() {
 	rootCmd.AddCommand(serveCmd)
+	serveCmd.Flags().StringVar(&Handler, "handler", "datagram", "Handler to use. Options are: datagram, streamperframe")
+	serveCmd.Flags().BoolVar(&LogRTP, "logrtp", false, "Log RTP packets to stdout")
+	serveCmd.Flags().StringVarP(&Addr, "address", "a", "localhost:4242", "Address to bind to")
 }
 
 var serveCmd = &cobra.Command{
@@ -26,15 +33,25 @@ var serveCmd = &cobra.Command{
 
 func serve() error {
 	src := &Src{
-		scream:   true,
+		scream:   Scream,
 		feedback: make(chan []byte, 1024),
 	}
-	//src.logRTP()
+	if LogRTP {
+		src.logRTP()
+	}
+
+	var options []func(*transport.Server)
+	if Handler == "streamperframe" {
+		options = append(options, transport.SetSessionHandler(transport.NewManyStreamsHandlerThing(src)))
+	} else {
+		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src)))
+		options = append(options, transport.SetDatagramEnabled(true))
+	}
 
 	s, err := transport.NewServer(
-		"localhost:4242",
+		Addr,
 		nil,
-		transport.SetSessionHandler(transport.NewManyStreamsHandlerThing(src)),
+		options...,
 	)
 	if err != nil {
 		return err

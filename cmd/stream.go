@@ -10,6 +10,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/mengelbart/cgo-streamer/packet"
+
+	"github.com/mengelbart/cgo-streamer/transport"
+
 	"github.com/mengelbart/scream-go"
 
 	"github.com/mengelbart/cgo-streamer/gst"
@@ -33,6 +37,22 @@ var streamCmd = &cobra.Command{
 const addr = "localhost:4242"
 
 func run() error {
+	gst.StartMainLoop()
+	pipeline := gst.CreateSinkPipeline()
+	var client *transport.Client
+
+	if Scream {
+		screamWriter := packet.NewScreamReadWriter(pipeline)
+		client = transport.NewClient(addr, screamWriter)
+		go screamWriter.Run(client.RunFeedbackSender())
+	} else {
+		client = transport.NewClient(addr, pipeline)
+	}
+
+	return client.RunDgram()
+}
+
+func runOld() error {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-realtime"},

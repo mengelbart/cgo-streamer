@@ -40,8 +40,6 @@ func NewServer(addr string, tlsc *tls.Config, options ...func(*Server)) (*Server
 		addr:      addr,
 		tlsConfig: tlsc,
 		quicConfig: &quic.Config{
-			//MaxReceiveStreamFlowControlWindow:     maxControlWindowSize,
-			//MaxReceiveConnectionFlowControlWindow: maxControlWindowSize,
 			MaxIncomingStreams:    maxStreamCount,
 			MaxIncomingUniStreams: maxStreamCount,
 		},
@@ -71,6 +69,12 @@ func SetQuicTracer(t quictrace.Tracer) func(*Server) {
 func SetSessionHandler(sh SessionHandler) func(*Server) {
 	return func(s *Server) {
 		s.SessionHandler = sh
+	}
+}
+
+func SetDatagramEnabled(enabled bool) func(*Server) {
+	return func(s *Server) {
+		s.quicConfig.EnableDatagrams = enabled
 	}
 }
 

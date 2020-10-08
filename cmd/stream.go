@@ -87,7 +87,7 @@ func runOld() error {
 	gst.StartMainLoop()
 	pipeline := gst.CreateSinkPipeline()
 
-	rx := scream.NewRx()
+	rx := scream.NewRx(1)
 
 	fbStream, err := session.OpenUniStream()
 	if err != nil {

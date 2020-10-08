@@ -66,28 +66,25 @@ func (s *ScreamSendWriter) Run() {
 		case packet := <-s.packet:
 			s.q.Push(packet)
 			s.screamTx.NewMediaFrame(uint(time.Now().UTC().Unix()), s.ssrc, len(packet.Raw))
-			if running {
-				continue
-			}
 
 		case fb := <-s.feedback:
-			fbPacket := &CCFeedback{}
-			err := fbPacket.UnmarshalBinary(fb)
-			if err != nil {
-				log.Println(err)
-			}
+			//fbPacket := &CCFeedback{}
+			//err := fbPacket.UnmarshalBinary(fb)
+			//if err != nil {
+			//	log.Println(err)
+			//}
 			s.screamTx.IncomingStandardizedFeedback(uint(time.Now().UTC().Unix()), fb)
-			if running {
-				continue
-			}
 
 		case <-timer.C:
 			running = false
 		}
 
+		if s.q.Len() <= 0 || running {
+			continue
+		}
 		dT := s.screamTx.IsOkToTransmit(uint(time.Now().UTC().Unix()), s.ssrc)
 		if dT == -1 {
-			log.Println("send window full, waiting")
+			log.Println("send window full or no packets to transmit, waiting")
 			continue
 		}
 		if dT > 0.001 {
@@ -97,9 +94,6 @@ func (s *ScreamSendWriter) Run() {
 			continue
 		}
 		packet := s.q.Pop()
-		if packet == nil {
-			continue
-		}
 		bs, err := packet.Marshal()
 		if err != nil {
 			log.Println(err)
@@ -116,13 +110,11 @@ func (s *ScreamSendWriter) Run() {
 			uint(packet.SequenceNumber),
 			packet.Marker,
 		)
-		if dT == -1 {
-			log.Println("send window full, waiting")
-			continue
+		if dT != -1 {
+			log.Println("send window full or no packets to transmit, waiting")
+			running = true
+			timer = time.NewTimer(time.Duration(dT))
 		}
-
-		running = true
-		timer = time.NewTimer(time.Duration(dT))
 	}
 }
 
@@ -135,7 +127,7 @@ type ScreamReadWriter struct {
 func NewScreamReadWriter(w io.Writer) *ScreamReadWriter {
 	return &ScreamReadWriter{
 		w:          w,
-		screamRx:   scream.NewRx(),
+		screamRx:   scream.NewRx(1),
 		packetChan: make(chan *rtp.Packet, 1024),
 	}
 }
@@ -154,7 +146,6 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		isMark := true
 		select {
 		case p := <-s.packetChan:
 			s.screamRx.Receive(
@@ -165,12 +156,11 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 				int(p.SequenceNumber),
 				0,
 			)
-			//isMark = p.Marker
 		case <-ticker.C:
 		}
 		if ok, feedback := s.screamRx.CreateStandardizedFeedback(
 			uint(time.Now().UTC().Unix()),
-			isMark,
+			true,
 		); ok {
 			_, err := fbw.Write(feedback)
 			if err != nil {

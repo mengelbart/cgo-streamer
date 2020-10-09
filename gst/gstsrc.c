@@ -78,7 +78,7 @@ void go_gst_stop_src_pipeline(GstElement* pipeline) {
     gst_element_set_state(pipeline, GST_STATE_NULL);
 }
 
-void go_gst_destroy_pipeline(GstElement* pipeline) {
+void go_gst_destroy_src_pipeline(GstElement* pipeline) {
     gst_object_unref(pipeline);
 }
 

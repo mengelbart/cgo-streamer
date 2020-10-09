@@ -1,6 +1,8 @@
 package packet
 
-import "github.com/pion/rtp"
+import (
+	"github.com/pion/rtp"
+)
 
 type Queue struct {
 	q []*rtp.Packet
@@ -57,10 +59,13 @@ func (q *Queue) GetDelay(f float64) float64 {
 	if len(q.q) <= 0 {
 		return 0
 	}
-	return float64(q.q[0].Timestamp)
+	return f - float64(q.q[0].Timestamp)
 }
 
 // TODO: Which frame?
 func (q *Queue) GetSizeOfLastFrame() int {
-	return 0
+	if len(q.q) <= 0 {
+		return 0
+	}
+	return len(q.q[len(q.q)-1].Raw)
 }

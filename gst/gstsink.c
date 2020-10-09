@@ -7,7 +7,6 @@ static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 
     case GST_MESSAGE_EOS: {
         g_print("End of stream\n");
-        exit(1);
         break;
     }
 
@@ -35,14 +34,24 @@ GstElement *go_gst_create_sink_pipeline(char *pipelineStr) {
 
     gst_init(NULL, NULL);
 
-    pipeline = gst_parse_launch(pipelineStr, &error);
+    return gst_parse_launch(pipelineStr, &error);
+}
 
+void go_gst_start_sink_pipeline(GstElement* pipeline) {
     GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
     gst_bus_add_watch(bus, go_gst_bus_call, NULL);
     gst_object_unref(bus);
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    return pipeline;
+}
+
+void go_gst_stop_sink_pipeline(GstElement* pipeline) {
+    gst_element_send_event (pipeline, gst_event_new_eos());
+}
+
+void go_gst_destroy_sink_pipeline(GstElement* pipeline) {
+    gst_element_set_state(pipeline, GST_STATE_NULL);
+    gst_object_unref(pipeline);
 }
 
 void go_gst_receive_push_buffer(GstElement *pipeline, void *buffer, int len) {

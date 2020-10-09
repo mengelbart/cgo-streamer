@@ -25,14 +25,16 @@ type SrcPipeline struct {
 	writer   io.Writer
 }
 
-func NewSrcPipeline(w io.Writer) *SrcPipeline {
+func NewSrcPipeline(w io.Writer, src string) *SrcPipeline {
 	srcPipelinesLock.Lock()
 	defer srcPipelinesLock.Unlock()
 	id := nextPipelineID
 	nextPipelineID++
+	pipelineStr := src + " ! x264enc name=x264enc ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
+	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	sp := &SrcPipeline{
 		id:       id,
-		pipeline: C.go_gst_create_src_pipeline(C.CString("videotestsrc ! x264enc name=x264enc ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink")),
+		pipeline: C.go_gst_create_src_pipeline(C.CString(pipelineStr)),
 		writer:   w,
 	}
 	srcPipelines[sp.id] = sp
@@ -48,7 +50,7 @@ func (p *SrcPipeline) Stop() {
 }
 
 func (p *SrcPipeline) Destroy() {
-	C.go_gst_destroy_pipeline(p.pipeline)
+	C.go_gst_destroy_src_pipeline(p.pipeline)
 }
 
 func (p *SrcPipeline) SSRC() uint {

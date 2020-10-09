@@ -62,29 +62,34 @@ func (s *ScreamSendWriter) Run() {
 	timer := time.NewTimer(0)
 	running := false
 	for {
+		stats := s.screamTx.GetStatistics(uint(time.Now().UTC().Unix()))
+		log.Println(stats)
+		log.Printf("len(s.packetChan) = %v", len(s.packet))
+		log.Printf("len(s.feedbackChan) = %v", len(s.feedback))
 		select {
 		case packet := <-s.packet:
 			s.q.Push(packet)
+			log.Println("pushed packet to queue")
 			s.screamTx.NewMediaFrame(uint(time.Now().UTC().Unix()), s.ssrc, len(packet.Raw))
 
 		case fb := <-s.feedback:
-			//fbPacket := &CCFeedback{}
-			//err := fbPacket.UnmarshalBinary(fb)
-			//if err != nil {
-			//	log.Println(err)
-			//}
 			s.screamTx.IncomingStandardizedFeedback(uint(time.Now().UTC().Unix()), fb)
 
 		case <-timer.C:
 			running = false
 		}
 
-		if s.q.Len() <= 0 || running {
+		if s.q.Len() <= 0 {
+			log.Println("queue empty, continue")
+			continue
+		}
+		if running {
+			log.Println("timer running, continue")
 			continue
 		}
 		dT := s.screamTx.IsOkToTransmit(uint(time.Now().UTC().Unix()), s.ssrc)
 		if dT == -1 {
-			log.Println("send window full or no packets to transmit, waiting")
+			log.Printf("not ok to transmit: send window full or no packets to transmit, waiting")
 			continue
 		}
 		if dT > 0.001 {
@@ -111,7 +116,7 @@ func (s *ScreamSendWriter) Run() {
 			packet.Marker,
 		)
 		if dT != -1 {
-			log.Println("send window full or no packets to transmit, waiting")
+			log.Printf("after transmitted: waiting for %v", dT)
 			running = true
 			timer = time.NewTimer(time.Duration(dT))
 		}
@@ -122,6 +127,7 @@ type ScreamReadWriter struct {
 	w          io.Writer
 	screamRx   *scream.Rx
 	packetChan chan *rtp.Packet
+	CloseChan  chan struct{}
 }
 
 func NewScreamReadWriter(w io.Writer) *ScreamReadWriter {
@@ -129,6 +135,7 @@ func NewScreamReadWriter(w io.Writer) *ScreamReadWriter {
 		w:          w,
 		screamRx:   scream.NewRx(1),
 		packetChan: make(chan *rtp.Packet, 1024),
+		CloseChan:  make(chan struct{}, 1),
 	}
 }
 
@@ -143,7 +150,7 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 }
 
 func (s *ScreamReadWriter) Run(fbw io.Writer) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
@@ -157,6 +164,8 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 				0,
 			)
 		case <-ticker.C:
+		case <-s.CloseChan:
+			return
 		}
 		if ok, feedback := s.screamRx.CreateStandardizedFeedback(
 			uint(time.Now().UTC().Unix()),

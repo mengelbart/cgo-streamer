@@ -5,9 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/mengelbart/cgo-streamer/packet"
@@ -23,8 +26,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var VideoSink string
+
 func init() {
 	rootCmd.AddCommand(streamCmd)
+	streamCmd.Flags().StringVar(&VideoSink, "video-sink", "autovideosink", "File to save video")
 }
 
 var streamCmd = &cobra.Command{
@@ -37,19 +43,51 @@ var streamCmd = &cobra.Command{
 const addr = "localhost:4242"
 
 func run() error {
+	if !Debug {
+		log.SetOutput(ioutil.Discard)
+	}
+	vSink := VideoSink
+	if vSink != "autovideosink" {
+		vSink = fmt.Sprintf(" queue ! x264enc ! mp4mux ! filesink location=%v", VideoSink)
+	}
 	gst.StartMainLoop()
-	pipeline := gst.CreateSinkPipeline()
+	pipeline := gst.CreateSinkPipeline(vSink)
+	pipeline.Start()
 	var client *transport.Client
 
+	var closeChans []chan<- struct{}
 	if Scream {
 		screamWriter := packet.NewScreamReadWriter(pipeline)
+		closeChans = append(closeChans, screamWriter.CloseChan)
 		client = transport.NewClient(addr, screamWriter)
-		go screamWriter.Run(client.RunFeedbackSender())
+		sender, c := client.RunFeedbackSender()
+		closeChans = append(closeChans, c)
+		go screamWriter.Run(sender)
 	} else {
 		client = transport.NewClient(addr, pipeline)
 	}
+	closeChans = append(closeChans, client.CloseChan)
 
-	return client.RunDgram()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+
+	var err error
+	go func() {
+		err = client.RunDgram()
+	}()
+
+	sig := <-signals
+	log.Println(sig)
+	log.Println("stopping pipeline")
+	pipeline.Stop()
+	time.Sleep(3 * time.Second)
+	pipeline.Destroy()
+	for _, c := range closeChans {
+		close(c)
+	}
+
+	log.Println("exiting")
+	return err
 }
 
 func runOld() error {
@@ -85,7 +123,7 @@ func runOld() error {
 	log.Println("opened stream, creating pipeline")
 
 	gst.StartMainLoop()
-	pipeline := gst.CreateSinkPipeline()
+	pipeline := gst.CreateSinkPipeline("videotestsrc")
 
 	rx := scream.NewRx(1)
 
@@ -142,7 +180,6 @@ func runOld() error {
 		if err != nil {
 			return err
 		}
-		//fmt.Println(packet)
 		packetChan <- packet
 
 		_, err = io.Copy(pipeline, bytes.NewReader(bs))

@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
+	"path/filepath"
 
 	"github.com/mengelbart/cgo-streamer/gst"
 	"github.com/mengelbart/cgo-streamer/packet"
@@ -13,12 +17,14 @@ import (
 
 var tracer quictrace.Tracer
 
+var VideoSrc string
 var LogRTP bool
 var Handler string
 var Addr string
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
+	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
 	serveCmd.Flags().StringVar(&Handler, "handler", "datagram", "Handler to use. Options are: datagram, streamperframe")
 	serveCmd.Flags().BoolVar(&LogRTP, "logrtp", false, "Log RTP packets to stdout")
 	serveCmd.Flags().StringVarP(&Addr, "address", "a", "localhost:4242", "Address to bind to")
@@ -32,9 +38,23 @@ var serveCmd = &cobra.Command{
 }
 
 func serve() error {
+	if !Debug {
+		log.SetOutput(ioutil.Discard)
+	}
 	src := &Src{
+		videoSrc: VideoSrc,
 		scream:   Scream,
 		feedback: make(chan []byte, 1024),
+	}
+	if VideoSrc != "videotestsrc" {
+		switch filepath.Ext(VideoSrc) {
+		case ".mkv":
+			src.videoSrc = fmt.Sprintf("filesrc location=%v ! matroskademux ! decodebin ! videoconvert", VideoSrc)
+		case ".webm":
+			src.videoSrc = fmt.Sprintf("filesrc location=%v ! matroskademux ! vp8dec ! videoconvert", VideoSrc)
+		case ".mp4":
+			src.videoSrc = fmt.Sprintf("filesrc location=%v ! decodebin ! videoconvert", VideoSrc)
+		}
 	}
 	if LogRTP {
 		src.logRTP()
@@ -61,6 +81,7 @@ func serve() error {
 
 type Src struct {
 	scream   bool
+	videoSrc string
 	writers  []io.Writer
 	feedback chan []byte
 }
@@ -79,7 +100,7 @@ func (s *Src) MakeSrc(w io.Writer) func() {
 func (s *Src) MakeSimpleSrc(w io.Writer) func() {
 
 	mw := io.MultiWriter(append(s.writers, w)...)
-	p := gst.NewSrcPipeline(mw)
+	p := gst.NewSrcPipeline(mw, s.videoSrc)
 
 	p.Start()
 	go func() {
@@ -104,7 +125,7 @@ func (s *Src) MakeScreamSrc(w io.Writer) func() {
 	ssrc := uint(1)
 	cc := packet.NewScreamWriter(ssrc, mw, s.FeedbackChan())
 
-	p := gst.NewSrcPipeline(cc)
+	p := gst.NewSrcPipeline(cc, s.videoSrc)
 	p.SetSSRC(ssrc)
 	p.Start()
 	go cc.Run()

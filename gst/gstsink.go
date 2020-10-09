@@ -10,23 +10,36 @@ import (
 	"log"
 )
 
-func CreateSinkPipeline() *Pipeline {
-	return &Pipeline{
-		Pipeline: C.go_gst_create_sink_pipeline(C.CString("appsrc name=src ! application/x-rtp,clock-rate=90000,payload=96 ! rtpjitterbuffer ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink")),
+func CreateSinkPipeline(videoSink string) *SinkPipeline {
+	pipelineStr := "appsrc name=src ! application/x-rtp,clock-rate=90000,payload=96 ! rtpjitterbuffer ! rtph264depay ! h264parse ! avdec_h264 ! " + videoSink
+	log.Printf("creating pipeline: '%v'\n", pipelineStr)
+	return &SinkPipeline{
+		pipeline: C.go_gst_create_sink_pipeline(C.CString(pipelineStr)),
 	}
 }
 
-type Pipeline struct {
-	Pipeline *C.GstElement
+type SinkPipeline struct {
+	pipeline *C.GstElement
 }
 
 var numBytes = 0
 
-func (p *Pipeline) Write(buffer []byte) (n int, err error) {
+func (p *SinkPipeline) Start() {
+	C.go_gst_start_sink_pipeline(p.pipeline)
+}
+
+func (p *SinkPipeline) Stop() {
+	C.go_gst_stop_sink_pipeline(p.pipeline)
+}
+
+func (p *SinkPipeline) Destroy() {
+	C.go_gst_destroy_sink_pipeline(p.pipeline)
+}
+
+func (p *SinkPipeline) Write(buffer []byte) (n int, err error) {
 	b := C.CBytes(buffer)
 	defer C.free(b)
-	C.go_gst_receive_push_buffer(p.Pipeline, b, C.int(len(buffer)))
+	C.go_gst_receive_push_buffer(p.pipeline, b, C.int(len(buffer)))
 	numBytes += len(buffer)
-	log.Printf("%v bytes written to pipeline", len(buffer))
 	return len(buffer), nil
 }

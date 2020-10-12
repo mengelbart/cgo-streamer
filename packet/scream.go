@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -45,12 +46,17 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 
 func (s ScreamSendWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) {
 	ticker := time.NewTicker(200 * time.Millisecond)
+	var lastBitrate uint
 	for {
 		select {
 		case <-ticker.C:
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
-			setBitrate(uint(kbps))
-			log.Printf("set bitrate to %v kbps", kbps)
+			fmt.Printf("new targetbitrate: %v\n", kbps)
+			if lastBitrate != uint(kbps) {
+				lastBitrate = uint(kbps)
+				setBitrate(lastBitrate)
+				fmt.Printf("set bitrate to %v kbps\n", lastBitrate)
+			}
 		case <-done:
 			return
 		}

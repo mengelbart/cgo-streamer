@@ -13,8 +13,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/mengelbart/cgo-streamer/packet"
-
 	"github.com/mengelbart/cgo-streamer/transport"
 
 	"github.com/mengelbart/scream-go"
@@ -49,6 +47,8 @@ func run() error {
 	vSink := VideoSink
 	if vSink != "autovideosink" {
 		vSink = fmt.Sprintf(" queue ! x264enc ! mp4mux ! filesink location=%v", VideoSink)
+	} else {
+		vSink = "videoconvert ! autovideosink"
 	}
 	gst.StartMainLoop()
 	pipeline := gst.CreateSinkPipeline(vSink)
@@ -57,7 +57,7 @@ func run() error {
 
 	var closeChans []chan<- struct{}
 	if Scream {
-		screamWriter := packet.NewScreamReadWriter(pipeline)
+		screamWriter := transport.NewScreamReadWriter(pipeline)
 		closeChans = append(closeChans, screamWriter.CloseChan)
 		client = transport.NewClient(addr, screamWriter)
 		sender, c := client.RunFeedbackSender()

@@ -1,4 +1,4 @@
-package packet
+package transport
 
 import (
 	"github.com/pion/rtp"

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/mengelbart/cgo-streamer/gst"
-	"github.com/mengelbart/cgo-streamer/packet"
 	"github.com/mengelbart/cgo-streamer/transport"
 
 	"github.com/lucas-clemente/quic-go/quictrace"
@@ -87,7 +86,7 @@ type Src struct {
 }
 
 func (s *Src) logRTP() {
-	s.writers = append(s.writers, &packet.Logger{})
+	s.writers = append(s.writers, &transport.Logger{})
 }
 
 func (s *Src) MakeSrc(w io.Writer) func() {
@@ -123,7 +122,7 @@ func (s *Src) FeedbackChan() chan []byte {
 func (s *Src) MakeScreamSrc(w io.Writer) func() {
 	mw := io.MultiWriter(append(s.writers, w)...)
 	ssrc := uint(1)
-	cc := packet.NewScreamWriter(ssrc, mw, s.FeedbackChan())
+	cc := transport.NewScreamWriter(ssrc, mw, s.FeedbackChan())
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc)
 	p.SetSSRC(ssrc)

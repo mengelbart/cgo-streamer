@@ -18,13 +18,11 @@ var tracer quictrace.Tracer
 
 var VideoSrc string
 var LogRTP bool
-var Handler string
 var Addr string
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
-	serveCmd.Flags().StringVar(&Handler, "handler", "datagram", "Handler to use. Options are: datagram, streamperframe")
 	serveCmd.Flags().BoolVar(&LogRTP, "logrtp", false, "Log RTP packets to stdout")
 	serveCmd.Flags().StringVarP(&Addr, "address", "a", "localhost:4242", "Address to bind to")
 }
@@ -34,6 +32,10 @@ var serveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return serve()
 	},
+}
+
+type Runner interface {
+	Run() error
 }
 
 func serve() error {
@@ -59,23 +61,27 @@ func serve() error {
 		src.logRTP()
 	}
 
-	var options []func(*transport.Server)
-	if Handler == "streamperframe" {
+	var runner Runner
+	var options []func(*transport.QUICServer)
+	switch Handler {
+	case "udp":
+		runner = transport.NewUDPServer(Addr, transport.SetPacketHandler(transport.NewUDPPacketHandler(src)))
+	case "streamperframe":
 		options = append(options, transport.SetSessionHandler(transport.NewManyStreamsHandlerThing(src)))
-	} else {
+		fallthrough
+	case "datagram":
 		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src)))
 		options = append(options, transport.SetDatagramEnabled(true))
+		fallthrough
+	default:
+		s, err := transport.NewQUICServer(Addr, nil, options...)
+		if err != nil {
+			return err
+		}
+		runner = s
 	}
 
-	s, err := transport.NewServer(
-		Addr,
-		nil,
-		options...,
-	)
-	if err != nil {
-		return err
-	}
-	return s.Run()
+	return runner.Run()
 }
 
 type Src struct {

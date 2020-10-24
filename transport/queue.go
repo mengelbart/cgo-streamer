@@ -8,6 +8,12 @@ type Queue struct {
 	q []*rtp.Packet
 }
 
+func NewQueue() *Queue {
+	return &Queue{
+		make([]*rtp.Packet, 0),
+	}
+}
+
 func (q *Queue) Push(p *rtp.Packet) {
 	q.q = append(q.q, p)
 }

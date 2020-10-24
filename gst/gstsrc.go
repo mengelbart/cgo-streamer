@@ -65,6 +65,8 @@ func (p *SrcPipeline) SetBitRate(bitrate uint) {
 	C.go_gst_set_bitrate(p.pipeline, C.uint(bitrate))
 }
 
+var countSrc = 0
+
 //export goHandlePipelineBuffer
 func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineID C.int) {
 	srcPipelinesLock.Lock()
@@ -77,6 +79,8 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 	}
 
 	bs := C.GoBytes(buffer, bufferLen)
+	countSrc++
+	log.Printf("%v: writing %v bytes to conn\n", countSrc, len(bs))
 	n, err := io.Copy(srcPipeline.writer, bytes.NewReader(bs))
 	if n != int64(bufferLen) {
 		log.Printf("different buffer size written: %v vs. %v", n, bufferLen)

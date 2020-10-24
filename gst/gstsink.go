@@ -36,7 +36,11 @@ func (p *SinkPipeline) Destroy() {
 	C.go_gst_destroy_sink_pipeline(p.pipeline)
 }
 
+var countSink = 0
+
 func (p *SinkPipeline) Write(buffer []byte) (n int, err error) {
+	countSink++
+	log.Printf("%v: writing %v bytes to pipeline\n", countSink, len(buffer))
 	b := C.CBytes(buffer)
 	defer C.free(b)
 	C.go_gst_receive_push_buffer(p.pipeline, b, C.int(len(buffer)))

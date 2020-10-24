@@ -53,27 +53,27 @@ func run() error {
 	gst.StartMainLoop()
 	pipeline := gst.CreateSinkPipeline(vSink)
 	pipeline.Start()
-	var client *transport.Client
-
 	var closeChans []chan<- struct{}
+
+	var client FeedbackRunner
 	if Scream {
 		screamWriter := transport.NewScreamReadWriter(pipeline)
 		closeChans = append(closeChans, screamWriter.CloseChan)
-		client = transport.NewClient(addr, screamWriter)
+		client = newClient(Handler, addr, screamWriter)
 		sender, c := client.RunFeedbackSender()
 		closeChans = append(closeChans, c)
 		go screamWriter.Run(sender)
 	} else {
-		client = transport.NewClient(addr, pipeline)
+		client = newClient(Handler, addr, pipeline)
 	}
-	closeChans = append(closeChans, client.CloseChan)
+	closeChans = append(closeChans, client.CloseChan())
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
 	var err error
 	go func() {
-		err = client.RunDgram()
+		err = client.Run()
 	}()
 
 	sig := <-signals
@@ -88,6 +88,25 @@ func run() error {
 
 	log.Println("exiting")
 	return err
+}
+
+type FeedbackRunner interface {
+	Runner
+	RunFeedbackSender() (io.Writer, chan<- struct{})
+	CloseChan() chan struct{}
+}
+
+func newClient(handler string, addr string, w io.Writer) FeedbackRunner {
+	switch handler {
+	case "udp":
+		return transport.NewUDPClient(addr, w)
+	case "streamperframe":
+		panic("streamperframe client not implemented")
+	case "datagram":
+		fallthrough
+	default:
+		return transport.NewQUICClient(addr, w)
+	}
 }
 
 func runOld() error {

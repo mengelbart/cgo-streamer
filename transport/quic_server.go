@@ -28,15 +28,15 @@ func (d defaultSessionHandler) handle(session quic.Session) error {
 	return session.CloseWithError(0, string(d))
 }
 
-type Server struct {
+type QUICServer struct {
 	SessionHandler
 	addr       string
 	tlsConfig  *tls.Config
 	quicConfig *quic.Config
 }
 
-func NewServer(addr string, tlsc *tls.Config, options ...func(*Server)) (*Server, error) {
-	s := &Server{
+func NewQUICServer(addr string, tlsc *tls.Config, options ...func(*QUICServer)) (*QUICServer, error) {
+	s := &QUICServer{
 		addr:      addr,
 		tlsConfig: tlsc,
 		quicConfig: &quic.Config{
@@ -60,25 +60,25 @@ func NewServer(addr string, tlsc *tls.Config, options ...func(*Server)) (*Server
 	return s, nil
 }
 
-func SetQuicTracer(t quictrace.Tracer) func(*Server) {
-	return func(s *Server) {
+func SetQuicTracer(t quictrace.Tracer) func(*QUICServer) {
+	return func(s *QUICServer) {
 		s.quicConfig.QuicTracer = t
 	}
 }
 
-func SetSessionHandler(sh SessionHandler) func(*Server) {
-	return func(s *Server) {
+func SetSessionHandler(sh SessionHandler) func(*QUICServer) {
+	return func(s *QUICServer) {
 		s.SessionHandler = sh
 	}
 }
 
-func SetDatagramEnabled(enabled bool) func(*Server) {
-	return func(s *Server) {
+func SetDatagramEnabled(enabled bool) func(*QUICServer) {
+	return func(s *QUICServer) {
 		s.quicConfig.EnableDatagrams = enabled
 	}
 }
 
-func (s *Server) Run() error {
+func (s *QUICServer) Run() error {
 	listener, err := quic.ListenAddr(
 		s.addr,
 		s.tlsConfig,
@@ -90,7 +90,7 @@ func (s *Server) Run() error {
 	return s.accept(listener)
 }
 
-func (s *Server) accept(listener quic.Listener) error {
+func (s *QUICServer) accept(listener quic.Listener) error {
 	for {
 		sess, err := listener.Accept(context.Background())
 		if err != nil {

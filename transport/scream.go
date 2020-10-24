@@ -20,7 +20,7 @@ type ScreamSendWriter struct {
 }
 
 func NewScreamWriter(ssrc uint, w io.Writer, fb chan []byte) *ScreamSendWriter {
-	queue := &Queue{}
+	queue := NewQueue()
 	screamTx := scream.NewTx()
 	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 2048000, 2048000000)
 

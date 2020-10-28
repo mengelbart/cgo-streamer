@@ -12,8 +12,7 @@ import (
 )
 
 type SrcFactory interface {
-	MakeSrc(writer io.Writer) func()
-	FeedbackChan() chan []byte
+	MakeSrc(writer io.WriteCloser, feedback <-chan []byte) func()
 }
 
 type ManyStreamsHandlerThing struct {
@@ -26,7 +25,7 @@ func NewManyStreamsHandlerThing(src SrcFactory) *ManyStreamsHandlerThing {
 	return &ManyStreamsHandlerThing{
 		Close:    make(chan struct{}, 1),
 		src:      src,
-		feedback: src.FeedbackChan(),
+		feedback: make(chan []byte, 1024),
 	}
 }
 
@@ -41,7 +40,7 @@ func (m *ManyStreamsHandlerThing) handle(sess quic.Session) error {
 		err := handler.AcceptFeedback()
 		errChan <- err
 	}()
-	cancel := m.src.MakeSrc(handler)
+	cancel := m.src.MakeSrc(handler, m.feedback)
 	defer cancel()
 	select {
 	case <-m.Close:
@@ -55,6 +54,10 @@ type ManyStreamWriterThing struct {
 	session  quic.Session
 	err      chan error
 	feedback chan []byte
+}
+
+func (m *ManyStreamWriterThing) Close() error {
+	panic("implement me")
 }
 
 func (m *ManyStreamWriterThing) AcceptFeedback() error {

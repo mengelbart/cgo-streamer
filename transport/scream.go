@@ -17,10 +17,16 @@ type ScreamSendWriter struct {
 	screamTx *scream.Tx
 	ssrc     uint
 	packet   chan *rtp.Packet
-	feedback chan []byte
+	feedback <-chan []byte
+	done     chan struct{}
 }
 
-func NewScreamWriter(ssrc uint, w io.Writer, fb chan []byte) *ScreamSendWriter {
+func (s *ScreamSendWriter) Close() error {
+	close(s.done)
+	return nil
+}
+
+func NewScreamWriter(ssrc uint, w io.Writer, fb <-chan []byte) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
 	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 2048000, 2048000000)
@@ -31,6 +37,7 @@ func NewScreamWriter(ssrc uint, w io.Writer, fb chan []byte) *ScreamSendWriter {
 		screamTx: screamTx,
 		ssrc:     ssrc,
 		packet:   make(chan *rtp.Packet, 1024),
+		done:     make(chan struct{}, 1),
 		feedback: fb,
 	}
 }
@@ -45,7 +52,7 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (s ScreamSendWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) {
+func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	ticker := time.NewTicker(2000 * time.Millisecond)
 	var lastBitrate uint
 	for {
@@ -57,7 +64,7 @@ func (s ScreamSendWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) 
 				setBitrate(lastBitrate)
 				fmt.Printf("set bitrate to %v kbps\n", lastBitrate)
 			}
-		case <-done:
+		case <-s.done:
 			return
 		}
 
@@ -90,6 +97,9 @@ func (s *ScreamSendWriter) Run() {
 
 		case <-timer.C:
 			running = false
+		case <-s.done:
+			log.Println("done, closing ScreamSendWriter")
+			return
 		}
 
 		if s.q.Len() <= 0 {

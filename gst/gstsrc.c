@@ -4,7 +4,7 @@ static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     switch (GST_MESSAGE_TYPE(msg)) {
 
     case GST_MESSAGE_EOS: {
-        g_print("End of stream\n");
+        g_print("Unexpected end of stream signal\n");
         exit(1);
         break;
     }
@@ -28,6 +28,11 @@ static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     return TRUE;
 }
 
+GstFlowReturn go_gst_eos_handler(GstElement *object, gpointer user_data) {
+    SampleHandlerUserData *s = (SampleHandlerUserData*) user_data;
+    goHandleEOS(s->pipelineId);
+}
+
 GstFlowReturn go_gst_send_new_sample_handler(GstElement *object, gpointer user_data) {
     GstSample *sample = NULL;
     GstBuffer *buffer = NULL;
@@ -41,7 +46,7 @@ GstFlowReturn go_gst_send_new_sample_handler(GstElement *object, gpointer user_d
         buffer = gst_sample_get_buffer(sample);
         if (buffer) {
             gst_buffer_extract_dup(buffer, 0, gst_buffer_get_size(buffer), &copy, &copy_size);
-            goHandlePipelineBuffer(copy, copy_size, GST_BUFFER_DURATION(buffer), s->pipelineId);
+            goHandlePipelineBuffer(copy, copy_size, s->pipelineId);
         }
         gst_sample_unref(sample);
     }
@@ -69,6 +74,7 @@ void go_gst_start_src_pipeline(GstElement* pipeline, int pipelineId) {
     GstElement *appsink = gst_bin_get_by_name(GST_BIN(pipeline), "appsink");
     g_object_set(appsink, "emit-signals", TRUE, NULL);
     g_signal_connect(appsink, "new-sample", G_CALLBACK(go_gst_send_new_sample_handler), s);
+    g_signal_connect(appsink, "eos", G_CALLBACK(go_gst_eos_handler), s);
     gst_object_unref(appsink);
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);

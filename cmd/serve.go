@@ -22,7 +22,6 @@ var LogRTP bool
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
-	serveCmd.Flags().BoolVar(&LogRTP, "logrtp", false, "Log RTP packets to stdout")
 }
 
 var serveCmd = &cobra.Command{
@@ -43,7 +42,6 @@ func serve() error {
 	src := &Src{
 		videoSrc: VideoSrc,
 		scream:   Scream,
-		feedback: make(chan []byte, 1024),
 	}
 	if VideoSrc != "videotestsrc" {
 		switch filepath.Ext(VideoSrc) {
@@ -54,9 +52,6 @@ func serve() error {
 		case ".mp4":
 			src.videoSrc = fmt.Sprintf("filesrc location=%v ! decodebin ! videoconvert", VideoSrc)
 		}
-	}
-	if LogRTP {
-		src.logRTP()
 	}
 
 	var runner Runner
@@ -85,31 +80,24 @@ func serve() error {
 type Src struct {
 	scream   bool
 	videoSrc string
-	writers  []io.Writer
-	feedback chan []byte
 }
 
-func (s *Src) logRTP() {
-	s.writers = append(s.writers, &transport.Logger{})
-}
-
-func (s *Src) MakeSrc(w io.Writer) func() {
+func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	if s.scream {
-		return s.MakeScreamSrc(w)
+		return s.MakeScreamSrc(w, fb)
 	}
-	return s.MakeSimpleSrc(w)
+	return s.MakeSimpleSrc(w, fb)
 }
 
-func (s *Src) MakeSimpleSrc(w io.Writer) func() {
+func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
-	mw := io.MultiWriter(append(s.writers, w)...)
-	p := gst.NewSrcPipeline(mw, s.videoSrc)
+	p := gst.NewSrcPipeline(w, s.videoSrc)
 
 	p.Start()
 	go func() {
 		for {
 			// ignore feedback chan to avoid getting stuck when channel is full
-			<-s.feedback
+			<-fb
 		}
 	}()
 
@@ -119,20 +107,15 @@ func (s *Src) MakeSimpleSrc(w io.Writer) func() {
 	}
 }
 
-func (s *Src) FeedbackChan() chan []byte {
-	return s.feedback
-}
-
-func (s *Src) MakeScreamSrc(w io.Writer) func() {
-	mw := io.MultiWriter(append(s.writers, w)...)
+func (s *Src) MakeScreamSrc(w io.Writer, fb <-chan []byte) func() {
 	ssrc := uint(1)
-	cc := transport.NewScreamWriter(ssrc, mw, s.FeedbackChan())
+	cc := transport.NewScreamWriter(ssrc, w, fb)
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc)
 	p.SetSSRC(ssrc)
 	p.Start()
 	go cc.Run()
-	go cc.RunBitrate(make(chan struct{}, 1), p.SetBitRate)
+	go cc.RunBitrate(p.SetBitRate)
 
 	return func() {
 		p.Stop()

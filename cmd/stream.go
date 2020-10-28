@@ -69,16 +69,21 @@ func run() error {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
+	done := make(chan struct{}, 1)
 	var err error
 	go func() {
 		err = client.Run()
+		done <- struct{}{}
 	}()
 
-	sig := <-signals
-	log.Println(sig)
+	select {
+	case sig := <-signals:
+		log.Println(sig)
+	case <-done:
+	}
+
 	log.Println("stopping pipeline")
 	pipeline.Stop()
-	time.Sleep(3 * time.Second)
 	pipeline.Destroy()
 	for _, c := range closeChans {
 		close(c)

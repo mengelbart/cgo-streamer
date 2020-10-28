@@ -73,6 +73,11 @@ func (c *UDPClient) Run() error {
 		if err != nil {
 			log.Println(err)
 		}
+
+		if res := bytes.Compare(buf[:n], []byte("eos")); res == 0 {
+			return conn.Close()
+		}
+
 		_, err = io.Copy(c.writer, bytes.NewReader(buf[:n]))
 		if err != nil && err != io.EOF {
 			return err

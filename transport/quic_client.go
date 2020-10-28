@@ -79,6 +79,9 @@ func (c *QUICClient) Run() error {
 		default:
 		}
 		bs, err := c.session.ReceiveMessage()
+		if err != nil {
+			panic(err)
+		}
 		_, err = io.Copy(c.writer, bytes.NewReader(bs))
 		if err != nil && err != io.EOF {
 			return err

@@ -29,9 +29,9 @@ func (h *UDPPacketHandler) handle(conn net.PacketConn, addr net.Addr, buf []byte
 		ps = &UDPPacketSession{
 			conn:     conn,
 			addr:     addr,
-			feedback: h.src.FeedbackChan(),
+			feedback: make(chan []byte, 1024),
 		}
-		cancel := h.src.MakeSrc(ps)
+		cancel := h.src.MakeSrc(ps, ps.feedback)
 		ps.cancelFn = cancel
 		h.sessions[addr.String()] = ps
 		return nil
@@ -46,6 +46,14 @@ type UDPPacketSession struct {
 	addr     net.Addr
 	feedback chan []byte
 	cancelFn func()
+}
+
+func (s *UDPPacketSession) Close() error {
+	close(s.feedback)
+	log.Println("closing udp session")
+	_, err := s.conn.WriteTo([]byte("eos"), s.addr)
+	s.cancelFn()
+	return err
 }
 
 func (s *UDPPacketSession) AcceptFeedback(msg []byte) {

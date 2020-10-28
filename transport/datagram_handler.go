@@ -1,6 +1,9 @@
 package transport
 
 import (
+	"errors"
+	"log"
+
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -14,25 +17,18 @@ func NewDatagramHandler(src SrcFactory) *DatagramHandler {
 	}
 }
 
-type DatagramSession struct {
-	sess        quic.Session
-	feedback    chan []byte
-	closeChan   chan error
-	feedbackErr chan error
-}
-
 func (d *DatagramHandler) handle(session quic.Session) error {
 
 	ds := &DatagramSession{
 		sess:        session,
-		feedback:    d.src.FeedbackChan(),
+		feedback:    make(chan []byte, 1024),
 		closeChan:   make(chan error, 1),
 		feedbackErr: make(chan error, 1),
 	}
 
-	go ds.AcceptFeedback()
+	go ds.AcceptFeedback(ds.feedback)
 
-	cancel := d.src.MakeSrc(ds)
+	cancel := d.src.MakeSrc(ds, ds.feedback)
 	defer cancel()
 
 	var err error
@@ -40,24 +36,38 @@ func (d *DatagramHandler) handle(session quic.Session) error {
 	case err = <-ds.closeChan:
 	case err = <-ds.feedbackErr:
 	}
-	return ds.sess.CloseWithError(0, err.Error())
+	log.Println("closing dgram session")
+	if err != nil {
+		log.Println(err)
+		return ds.sess.CloseWithError(1, err.Error())
+	}
+	return ds.sess.CloseWithError(0, "")
 }
 
-func (d *DatagramSession) AcceptFeedback() {
+func (d *DatagramSession) Close() error {
+	d.closeChan <- errors.New("eos")
+	return nil
+}
+
+type DatagramSession struct {
+	sess        quic.Session
+	feedback    chan []byte
+	closeChan   chan error
+	feedbackErr chan error
+}
+
+// TODO: Close properly, in case ReceiveMessage doesn't error out on session.Close?
+func (d *DatagramSession) AcceptFeedback(fbChan chan<- []byte) {
 	for {
 		msg, err := d.sess.ReceiveMessage()
 		if err != nil {
 			d.feedbackErr <- err
 		}
-		d.feedback <- msg
+		fbChan <- msg
 	}
 }
 
 func (d *DatagramSession) Write(b []byte) (int, error) {
 	err := d.sess.SendMessage(b)
-	if err != nil {
-		d.closeChan <- err
-		return 0, err
-	}
-	return len(b), nil
+	return len(b), err
 }

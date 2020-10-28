@@ -22,10 +22,10 @@ var srcPipelinesLock sync.Mutex
 type SrcPipeline struct {
 	id       int
 	pipeline *C.GstElement
-	writer   io.Writer
+	writer   io.WriteCloser
 }
 
-func NewSrcPipeline(w io.Writer, src string) *SrcPipeline {
+func NewSrcPipeline(w io.WriteCloser, src string) *SrcPipeline {
 	srcPipelinesLock.Lock()
 	defer srcPipelinesLock.Unlock()
 	id := nextPipelineID
@@ -68,7 +68,7 @@ func (p *SrcPipeline) SetBitRate(bitrate uint) {
 var countSrc = 0
 
 //export goHandlePipelineBuffer
-func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.int, pipelineID C.int) {
+func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, pipelineID C.int) {
 	srcPipelinesLock.Lock()
 	srcPipeline, ok := srcPipelines[int(pipelineID)]
 	srcPipelinesLock.Unlock()
@@ -87,5 +87,20 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 	}
 	if err != nil {
 		log.Printf("failed to write %v bytes to writer: %v", n, err)
+	}
+}
+
+//export goHandleEOS
+func goHandleEOS(pipelineID C.int) {
+	srcPipelinesLock.Lock()
+	srcPipeline, ok := srcPipelines[int(pipelineID)]
+	srcPipelinesLock.Unlock()
+	if !ok {
+		log.Printf("no pipeline with ID %v, discarding eos", int(pipelineID))
+		return
+	}
+	err := srcPipeline.writer.Close()
+	if err != nil {
+		log.Printf("failed close writer with id %v: %v", int(pipelineID), err)
 	}
 }

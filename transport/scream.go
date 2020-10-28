@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/mengelbart/scream-go"
@@ -45,13 +46,12 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 }
 
 func (s ScreamSendWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(2000 * time.Millisecond)
 	var lastBitrate uint
 	for {
 		select {
 		case <-ticker.C:
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
-			fmt.Printf("new targetbitrate: %v\n", kbps)
 			if lastBitrate != uint(kbps) {
 				lastBitrate = uint(kbps)
 				setBitrate(lastBitrate)
@@ -64,22 +64,29 @@ func (s ScreamSendWriter) RunBitrate(done chan struct{}, setBitrate func(uint)) 
 	}
 }
 
+func GetTimeNTP() uint {
+	t := time.Now().Unix()
+	ntp64 := t * 65536
+	return uint(ntp64 & 0xFFFFFFFF)
+}
+
 func (s *ScreamSendWriter) Run() {
 	timer := time.NewTimer(0)
 	running := false
 	for {
-		stats := s.screamTx.GetStatistics(uint(time.Now().UTC().Unix()))
-		log.Println(stats)
-		log.Printf("len(s.packetChan) = %v", len(s.packet))
-		log.Printf("len(s.feedbackChan) = %v", len(s.feedback))
+		stats := s.screamTx.GetStatistics(GetTimeNTP())
+		statSlice := strings.Split(stats, ",")
+		log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
+			statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
+		//log.Println(statSlice)
 		select {
 		case packet := <-s.packet:
 			s.q.Push(packet)
 			log.Println("pushed packet to queue")
-			s.screamTx.NewMediaFrame(uint(time.Now().UTC().Unix()), s.ssrc, len(packet.Raw))
+			s.screamTx.NewMediaFrame(GetTimeNTP(), s.ssrc, len(packet.Raw))
 
 		case fb := <-s.feedback:
-			s.screamTx.IncomingStandardizedFeedback(uint(time.Now().UTC().Unix()), fb)
+			s.screamTx.IncomingStandardizedFeedback(GetTimeNTP(), fb)
 
 		case <-timer.C:
 			running = false
@@ -93,7 +100,7 @@ func (s *ScreamSendWriter) Run() {
 			log.Println("timer running, continue")
 			continue
 		}
-		dT := s.screamTx.IsOkToTransmit(uint(time.Now().UTC().Unix()), s.ssrc)
+		dT := s.screamTx.IsOkToTransmit(GetTimeNTP(), s.ssrc)
 		if dT == -1 {
 			log.Printf("not ok to transmit: send window full or no packets to transmit, waiting")
 			continue
@@ -115,7 +122,7 @@ func (s *ScreamSendWriter) Run() {
 		}
 		log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
 		dT = s.screamTx.AddTransmitted(
-			uint(time.Now().UTC().Unix()),
+			GetTimeNTP(),
 			uint(packet.SSRC),
 			len(packet.Raw),
 			uint(packet.SequenceNumber),
@@ -156,13 +163,13 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 }
 
 func (s *ScreamReadWriter) Run(fbw io.Writer) {
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case p := <-s.packetChan:
 			s.screamRx.Receive(
-				uint(time.Now().UTC().Unix()),
+				GetTimeNTP(),
 				nil,
 				int(p.SSRC),
 				len(p.Raw),
@@ -174,7 +181,7 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 			return
 		}
 		if ok, feedback := s.screamRx.CreateStandardizedFeedback(
-			uint(time.Now().UTC().Unix()),
+			GetTimeNTP(),
 			true,
 		); ok {
 			_, err := fbw.Write(feedback)

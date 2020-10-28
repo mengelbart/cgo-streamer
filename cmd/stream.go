@@ -38,8 +38,6 @@ var streamCmd = &cobra.Command{
 	},
 }
 
-const addr = "localhost:4242"
-
 func run() error {
 	if !Debug {
 		log.SetOutput(ioutil.Discard)
@@ -59,12 +57,12 @@ func run() error {
 	if Scream {
 		screamWriter := transport.NewScreamReadWriter(pipeline)
 		closeChans = append(closeChans, screamWriter.CloseChan)
-		client = newClient(Handler, addr, screamWriter)
+		client = newClient(Handler, Addr, screamWriter)
 		sender, c := client.RunFeedbackSender()
 		closeChans = append(closeChans, c)
 		go screamWriter.Run(sender)
 	} else {
-		client = newClient(Handler, addr, pipeline)
+		client = newClient(Handler, Addr, pipeline)
 	}
 	closeChans = append(closeChans, client.CloseChan())
 
@@ -116,7 +114,7 @@ func runOld() error {
 	}
 	max := uint64(1 << 60)
 	session, err := quic.DialAddr(
-		addr,
+		Addr,
 		tlsConf,
 		&quic.Config{
 			MaxIncomingStreams:                    int64(max),
@@ -158,7 +156,7 @@ func runOld() error {
 			select {
 			case p := <-packetChan:
 				rx.Receive(
-					uint(time.Now().UTC().Unix()),
+					transport.GetTimeNTP(),
 					nil,
 					int(p.SSRC),
 					len(p.Raw),
@@ -168,7 +166,7 @@ func runOld() error {
 			case <-ticker.C:
 			}
 			if ok, feedback := rx.CreateStandardizedFeedback(
-				uint(time.Now().UTC().Unix()),
+				transport.GetTimeNTP(),
 				true,
 			); ok {
 				err := binary.Write(fbStream, binary.BigEndian, int32(len(feedback)))

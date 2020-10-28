@@ -68,7 +68,6 @@ func (q *Queue) GetDelay(f float64) float64 {
 	return f - float64(q.q[0].Timestamp)
 }
 
-// TODO: Which frame?
 func (q *Queue) GetSizeOfLastFrame() int {
 	if len(q.q) <= 0 {
 		return 0

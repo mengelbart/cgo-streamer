@@ -18,13 +18,11 @@ var tracer quictrace.Tracer
 
 var VideoSrc string
 var LogRTP bool
-var Addr string
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
 	serveCmd.Flags().BoolVar(&LogRTP, "logrtp", false, "Log RTP packets to stdout")
-	serveCmd.Flags().StringVarP(&Addr, "address", "a", "localhost:4242", "Address to bind to")
 }
 
 var serveCmd = &cobra.Command{

@@ -42,14 +42,18 @@ func run() error {
 	if !Debug {
 		log.SetOutput(ioutil.Discard)
 	}
-	vSink := VideoSink
-	if vSink != "autovideosink" {
-		vSink = fmt.Sprintf(" queue ! x264enc ! mp4mux ! filesink location=%v", VideoSink)
+	if VideoSink != "autovideosink" {
+		VideoSink = fmt.Sprintf(" matroskamux ! filesink location=%v", VideoSink)
 	} else {
-		vSink = "videoconvert ! autovideosink"
+		VideoSink = "videoconvert ! autovideosink"
 	}
 	gst.StartMainLoop()
-	pipeline := gst.CreateSinkPipeline(vSink)
+	pipeline := gst.CreateSinkPipeline(VideoSink)
+	destroyed := make(chan struct{}, 1)
+	gst.HandleSinkEOS(func() {
+		pipeline.Destroy()
+		destroyed <- struct{}{}
+	})
 	pipeline.Start()
 	var closeChans []chan<- struct{}
 
@@ -73,6 +77,7 @@ func run() error {
 	var err error
 	go func() {
 		err = client.Run()
+		log.Println("client run done")
 		done <- struct{}{}
 	}()
 
@@ -84,7 +89,7 @@ func run() error {
 
 	log.Println("stopping pipeline")
 	pipeline.Stop()
-	pipeline.Destroy()
+	<-destroyed
 	for _, c := range closeChans {
 		close(c)
 	}

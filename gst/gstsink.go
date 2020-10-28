@@ -11,7 +11,7 @@ import (
 )
 
 func CreateSinkPipeline(videoSink string) *SinkPipeline {
-	pipelineStr := "appsrc name=src ! application/x-rtp,clock-rate=90000,payload=96 ! rtpjitterbuffer ! rtph264depay ! h264parse ! avdec_h264 ! " + videoSink
+	pipelineStr := "appsrc name=src ! application/x-rtp ! rtpjitterbuffer ! rtph264depay ! h264parse ! avdec_h264 ! " + videoSink
 	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	return &SinkPipeline{
 		pipeline: C.go_gst_create_sink_pipeline(C.CString(pipelineStr)),
@@ -34,6 +34,17 @@ func (p *SinkPipeline) Stop() {
 
 func (p *SinkPipeline) Destroy() {
 	C.go_gst_destroy_sink_pipeline(p.pipeline)
+}
+
+var eosHandler func()
+
+func HandleSinkEOS(handler func()) {
+	eosHandler = handler
+}
+
+//export goHandleSinkEOS
+func goHandleSinkEOS() {
+	eosHandler()
 }
 
 var countSink = 0

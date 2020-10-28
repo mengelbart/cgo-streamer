@@ -80,7 +80,12 @@ func (c *QUICClient) Run() error {
 		}
 		bs, err := c.session.ReceiveMessage()
 		if err != nil {
-			panic(err)
+			// TODO: Datagram error handling in quic-go fork is not returning the correct type here
+			// otherwise we could just use a type assertion here.
+			if err.Error() == "Application error 0x1: eos" {
+				return nil
+			}
+			return err
 		}
 		_, err = io.Copy(c.writer, bytes.NewReader(bs))
 		if err != nil && err != io.EOF {

@@ -8,7 +8,7 @@ typedef struct SampleHandlerUserData {
 } SampleHandlerUserData;
 
 extern void goHandlePipelineBuffer(void *buffer, int bufferLen, int pipelineId);
-extern void goHandleEOS(int pipelineId);
+extern void goHandleSrcEOS(int pipelineId);
 GstElement* go_gst_create_src_pipeline(char *pipelineStr);
 void go_gst_start_src_pipeline(GstElement* pipeline, int pipelineId);
 void go_gst_stop_src_pipeline(GstElement* pipeline);

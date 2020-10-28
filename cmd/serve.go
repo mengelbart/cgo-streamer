@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"path/filepath"
 
 	"github.com/mengelbart/cgo-streamer/gst"
 	"github.com/mengelbart/cgo-streamer/transport"
@@ -44,14 +43,7 @@ func serve() error {
 		scream:   Scream,
 	}
 	if VideoSrc != "videotestsrc" {
-		switch filepath.Ext(VideoSrc) {
-		case ".mkv":
-			src.videoSrc = fmt.Sprintf("filesrc location=%v ! matroskademux ! decodebin ! videoconvert", VideoSrc)
-		case ".webm":
-			src.videoSrc = fmt.Sprintf("filesrc location=%v ! matroskademux ! vp8dec ! videoconvert", VideoSrc)
-		case ".mp4":
-			src.videoSrc = fmt.Sprintf("filesrc location=%v ! decodebin ! videoconvert", VideoSrc)
-		}
+		src.videoSrc = fmt.Sprintf("filesrc location=%v ! decodebin ! videoconvert", VideoSrc)
 	}
 
 	var runner Runner

@@ -90,8 +90,8 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, pipelineID C
 	}
 }
 
-//export goHandleEOS
-func goHandleEOS(pipelineID C.int) {
+//export goHandleSrcEOS
+func goHandleSrcEOS(pipelineID C.int) {
 	srcPipelinesLock.Lock()
 	srcPipeline, ok := srcPipelines[int(pipelineID)]
 	srcPipelinesLock.Unlock()

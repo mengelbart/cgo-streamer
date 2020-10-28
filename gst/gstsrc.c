@@ -30,7 +30,7 @@ static gboolean go_gst_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 
 GstFlowReturn go_gst_eos_handler(GstElement *object, gpointer user_data) {
     SampleHandlerUserData *s = (SampleHandlerUserData*) user_data;
-    goHandleEOS(s->pipelineId);
+    goHandleSrcEOS(s->pipelineId);
 }
 
 GstFlowReturn go_gst_send_new_sample_handler(GstElement *object, gpointer user_data) {

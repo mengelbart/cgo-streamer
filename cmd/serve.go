@@ -52,8 +52,12 @@ func serve() error {
 	case "udp":
 		runner = transport.NewUDPServer(Addr, transport.SetPacketHandler(transport.NewUDPPacketHandler(src)))
 	case "streamperframe":
-		options = append(options, transport.SetSessionHandler(transport.NewManyStreamsHandlerThing(src)))
-		fallthrough
+		options = append(options, transport.SetSessionHandler(transport.NewStreamPerFrameHandler(src)))
+		s, err := transport.NewQUICServer(Addr, nil, options...)
+		if err != nil {
+			return err
+		}
+		runner = s
 	case "datagram":
 		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src)))
 		options = append(options, transport.SetDatagramEnabled(true))

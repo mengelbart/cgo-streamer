@@ -1,26 +1,17 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
-	"crypto/tls"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/mengelbart/cgo-streamer/transport"
 
-	"github.com/mengelbart/scream-go"
-
 	"github.com/mengelbart/cgo-streamer/gst"
 
-	"github.com/lucas-clemente/quic-go"
-	"github.com/pion/rtp"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +53,10 @@ func run() error {
 		screamWriter := transport.NewScreamReadWriter(pipeline)
 		closeChans = append(closeChans, screamWriter.CloseChan)
 		client = newClient(Handler, Addr, screamWriter)
-		sender, c := client.RunFeedbackSender()
+		sender, c, err := client.RunFeedbackSender()
+		if err != nil {
+			return err
+		}
 		closeChans = append(closeChans, c)
 		go screamWriter.Run(sender)
 	} else {
@@ -100,7 +94,7 @@ func run() error {
 
 type FeedbackRunner interface {
 	Runner
-	RunFeedbackSender() (io.Writer, chan<- struct{})
+	RunFeedbackSender() (io.Writer, chan<- struct{}, error)
 	CloseChan() chan struct{}
 }
 
@@ -109,110 +103,10 @@ func newClient(handler string, addr string, w io.Writer) FeedbackRunner {
 	case "udp":
 		return transport.NewUDPClient(addr, w)
 	case "streamperframe":
-		panic("streamperframe client not implemented")
+		return transport.NewQUICClient(addr, w, false)
 	case "datagram":
 		fallthrough
 	default:
-		return transport.NewQUICClient(addr, w)
-	}
-}
-
-func runOld() error {
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-realtime"},
-	}
-	max := uint64(1 << 60)
-	session, err := quic.DialAddr(
-		Addr,
-		tlsConf,
-		&quic.Config{
-			MaxIncomingStreams:                    int64(max),
-			MaxIncomingUniStreams:                 int64(max),
-			MaxReceiveStreamFlowControlWindow:     max,
-			MaxReceiveConnectionFlowControlWindow: max,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	stream, err := session.OpenStreamSync(context.Background())
-	if err != nil {
-		return err
-	}
-
-	_, err = stream.Write([]byte("hello"))
-	if err != nil {
-		return err
-	}
-
-	log.Println("opened stream, creating pipeline")
-
-	gst.StartMainLoop()
-	pipeline := gst.CreateSinkPipeline("videotestsrc")
-
-	rx := scream.NewRx(1)
-
-	fbStream, err := session.OpenUniStream()
-	if err != nil {
-		return err
-	}
-	packetChan := make(chan *rtp.Packet, 1024)
-	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case p := <-packetChan:
-				rx.Receive(
-					transport.GetTimeNTP(),
-					nil,
-					int(p.SSRC),
-					len(p.Raw),
-					int(p.SequenceNumber),
-					0,
-				)
-			case <-ticker.C:
-			}
-			if ok, feedback := rx.CreateStandardizedFeedback(
-				transport.GetTimeNTP(),
-				true,
-			); ok {
-				err := binary.Write(fbStream, binary.BigEndian, int32(len(feedback)))
-				if err != nil {
-					log.Println(err)
-				}
-				_, err = fbStream.Write(feedback)
-				if err != nil {
-					log.Println(err)
-				}
-			}
-		}
-	}()
-
-	for {
-
-		stream, err := session.AcceptStream(context.Background())
-		if err != nil {
-			return err
-		}
-
-		bs, err := ioutil.ReadAll(stream)
-		if err != nil {
-			return err
-		}
-		packet := &rtp.Packet{}
-		err = packet.Unmarshal(bs)
-		if err != nil {
-			return err
-		}
-		packetChan <- packet
-
-		_, err = io.Copy(pipeline, bytes.NewReader(bs))
-		if err != nil && err != io.EOF {
-			panic(err)
-			return err
-		}
+		return transport.NewQUICClient(addr, w, true)
 	}
 }

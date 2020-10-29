@@ -22,7 +22,7 @@ func NewUDPClient(addr string, w io.Writer) *UDPClient {
 	}
 }
 
-func (c *UDPClient) RunFeedbackSender() (io.Writer, chan<- struct{}) {
+func (c *UDPClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 	fbw := FeedbackWriter(make(chan []byte, 1024))
 	done := make(chan struct{}, 1)
 	go func() {
@@ -38,7 +38,7 @@ func (c *UDPClient) RunFeedbackSender() (io.Writer, chan<- struct{}) {
 			}
 		}
 	}()
-	return fbw, done
+	return fbw, done, nil
 }
 
 func (c *UDPClient) CloseChan() chan struct{} {

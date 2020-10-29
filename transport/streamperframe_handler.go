@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -11,56 +12,55 @@ import (
 	"github.com/lucas-clemente/quic-go"
 )
 
-type SrcFactory interface {
-	MakeSrc(writer io.WriteCloser, feedback <-chan []byte) func()
+type StreamPerFrameHandler struct {
+	src SrcFactory
 }
 
-type ManyStreamsHandlerThing struct {
-	Close    chan struct{}
-	src      SrcFactory
-	feedback chan []byte
-}
-
-func NewManyStreamsHandlerThing(src SrcFactory) *ManyStreamsHandlerThing {
-	return &ManyStreamsHandlerThing{
-		Close:    make(chan struct{}, 1),
-		src:      src,
-		feedback: make(chan []byte, 1024),
+func NewStreamPerFrameHandler(src SrcFactory) *StreamPerFrameHandler {
+	return &StreamPerFrameHandler{
+		src: src,
 	}
 }
 
-func (m *ManyStreamsHandlerThing) handle(sess quic.Session) error {
+func (m *StreamPerFrameHandler) handle(sess quic.Session) error {
 	errChan := make(chan error, 1)
-	handler := &ManyStreamWriterThing{
+	session := &StreamPerFrameSession{
 		session:  sess,
 		err:      errChan,
-		feedback: m.feedback,
+		feedback: make(chan []byte, 1024),
 	}
 	go func() {
-		err := handler.AcceptFeedback()
+		err := session.AcceptFeedback()
 		errChan <- err
 	}()
-	cancel := m.src.MakeSrc(handler, m.feedback)
+
+	cancel := m.src.MakeSrc(session, session.feedback)
 	defer cancel()
+
+	var err error
 	select {
-	case <-m.Close:
-		return nil
-	case err := <-errChan:
-		return err
+	case err = <-errChan:
 	}
+	log.Println("closing streamperframe session")
+	if err != nil {
+		log.Println(err)
+		return session.session.CloseWithError(1, err.Error())
+	}
+	return session.session.CloseWithError(0, "")
 }
 
-type ManyStreamWriterThing struct {
+type StreamPerFrameSession struct {
 	session  quic.Session
 	err      chan error
 	feedback chan []byte
 }
 
-func (m *ManyStreamWriterThing) Close() error {
-	panic("implement me")
+func (m *StreamPerFrameSession) Close() error {
+	m.err <- errors.New("eos")
+	return nil
 }
 
-func (m *ManyStreamWriterThing) AcceptFeedback() error {
+func (m *StreamPerFrameSession) AcceptFeedback() error {
 	fbStream, err := m.session.AcceptUniStream(context.Background())
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (m *ManyStreamWriterThing) AcceptFeedback() error {
 	}
 }
 
-func (m *ManyStreamWriterThing) Write(b []byte) (int, error) {
+func (m *StreamPerFrameSession) Write(b []byte) (int, error) {
 	stream, err := m.session.OpenStreamSync(context.Background())
 	if err != nil {
 		log.Println("could not open stream, closing session")
@@ -114,21 +114,6 @@ func (m *ManyStreamWriterThing) Write(b []byte) (int, error) {
 		}
 		return 0, err
 	}
-
-	//traces := tracer.GetAllTraces()
-	//if len(traces) != 1 {
-	//	return 0, errors.New("expected excatly 1 trace")
-	//}
-	//for _, trace := range traces {
-	//	tracePB := &pb.Trace{}
-	//	err := proto.Unmarshal(trace, tracePB)
-	//	if err != nil {
-	//		return 0, err
-	//	}
-	//	for _, e := range tracePB.Events {
-	//		log.Println(e.TransportState)
-	//	}
-	//}
 
 	return int(n), nil
 }

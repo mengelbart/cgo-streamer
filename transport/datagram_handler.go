@@ -56,7 +56,6 @@ type DatagramSession struct {
 	feedbackErr chan error
 }
 
-// TODO: Close properly, in case ReceiveMessage doesn't error out on session.Close?
 func (d *DatagramSession) AcceptFeedback(fbChan chan<- []byte) {
 	for {
 		msg, err := d.sess.ReceiveMessage()

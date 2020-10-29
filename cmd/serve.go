@@ -103,7 +103,7 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	}
 }
 
-func (s *Src) MakeScreamSrc(w io.Writer, fb <-chan []byte) func() {
+func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	ssrc := uint(1)
 	cc := transport.NewScreamWriter(ssrc, w, fb)
 

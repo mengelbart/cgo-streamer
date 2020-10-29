@@ -28,6 +28,7 @@ func (m *StreamPerFrameHandler) handle(sess quic.Session) error {
 		session:  sess,
 		err:      errChan,
 		feedback: make(chan []byte, 1024),
+		done:     make(chan struct{}, 1),
 	}
 	go func() {
 		err := session.AcceptFeedback()
@@ -40,6 +41,8 @@ func (m *StreamPerFrameHandler) handle(sess quic.Session) error {
 	var err error
 	select {
 	case err = <-errChan:
+	case <-session.done:
+		err = errors.New("eos")
 	}
 	log.Println("closing streamperframe session")
 	if err != nil {
@@ -53,10 +56,11 @@ type StreamPerFrameSession struct {
 	session  quic.Session
 	err      chan error
 	feedback chan []byte
+	done     chan struct{}
 }
 
 func (m *StreamPerFrameSession) Close() error {
-	m.err <- errors.New("eos")
+	close(m.done)
 	return nil
 }
 
@@ -67,6 +71,11 @@ func (m *StreamPerFrameSession) AcceptFeedback() error {
 	}
 	log.Println("accepted feedback stream")
 	for {
+		select {
+		case <-m.done:
+			return nil
+		default:
+		}
 		var size int32
 		err := binary.Read(fbStream, binary.BigEndian, &size)
 		if err != nil {

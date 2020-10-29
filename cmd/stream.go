@@ -72,7 +72,10 @@ func run() error {
 	go func() {
 		err = client.Run()
 		log.Println("client run done")
-		done <- struct{}{}
+		close(done)
+		for _, c := range closeChans {
+			close(c)
+		}
 	}()
 
 	select {
@@ -84,9 +87,6 @@ func run() error {
 	log.Println("stopping pipeline")
 	pipeline.Stop()
 	<-destroyed
-	for _, c := range closeChans {
-		close(c)
-	}
 
 	log.Println("exiting")
 	return err

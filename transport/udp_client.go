@@ -33,6 +33,11 @@ func (c *UDPClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 				if err != nil {
 					log.Println(err)
 				}
+				if nErr, ok := err.(net.Error); ok {
+					if !nErr.Temporary() {
+						//return
+					}
+				}
 			case <-done:
 				return
 			}

@@ -20,7 +20,6 @@ func NewUDPPacketHandler(src SrcFactory) *UDPPacketHandler {
 }
 
 func (h *UDPPacketHandler) handle(conn net.PacketConn, addr net.Addr, buf []byte) error {
-	log.Printf("handling packet: %v\n", addr)
 	h.sessionMux.Lock()
 	defer h.sessionMux.Unlock()
 	ps, ok := h.sessions[addr.String()]
@@ -49,7 +48,6 @@ type UDPPacketSession struct {
 }
 
 func (s *UDPPacketSession) Close() error {
-	close(s.feedback)
 	log.Println("closing udp session")
 	_, err := s.conn.WriteTo([]byte("eos"), s.addr)
 	s.cancelFn()

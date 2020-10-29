@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"io"
 	"io/ioutil"
 	"log"
@@ -53,17 +54,25 @@ func (c *QUICClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 	fbw := FeedbackWriter(make(chan []byte, 1024))
 	done := make(chan struct{}, 1)
 	var fbSender func([]byte) error
+	var fbStream quic.SendStream
 	if c.dgram {
 		fbSender = func(fb []byte) error {
 			return c.session.SendMessage(fb)
 		}
 	} else {
-		fbStream, err := c.session.OpenUniStreamSync(context.Background())
-		if err != nil {
-			return nil, nil, err
-		}
 		fbSender = func(fb []byte) error {
-			_, err := fbStream.Write(fb)
+			if fbStream == nil {
+				var err error
+				fbStream, err = c.session.OpenUniStreamSync(context.Background())
+				if err != nil {
+					return err
+				}
+			}
+			err := binary.Write(fbStream, binary.BigEndian, int32(len(fb)))
+			if err != nil {
+				return err
+			}
+			_, err = fbStream.Write(fb)
 			return err
 		}
 	}
@@ -129,6 +138,10 @@ func (c *QUICClient) RunStreamPerFrame() error {
 		}
 		bs, err := ioutil.ReadAll(stream)
 		if err != nil {
+			// TODO: Figure out correct error handling
+			if err.Error() == "Application error 0x1: eos" {
+				return nil
+			}
 			return err
 		}
 		_, err = io.Copy(c.writer, bytes.NewReader(bs))

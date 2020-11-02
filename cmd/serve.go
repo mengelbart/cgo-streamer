@@ -43,7 +43,7 @@ func serve() error {
 		scream:   Scream,
 	}
 	if VideoSrc != "videotestsrc" {
-		src.videoSrc = fmt.Sprintf("filesrc location=%v ! decodebin ! videoconvert", VideoSrc)
+		src.videoSrc = fmt.Sprintf("filesrc location=%v ! queue ! decodebin ! videoconvert ", VideoSrc)
 	}
 
 	var runner Runner

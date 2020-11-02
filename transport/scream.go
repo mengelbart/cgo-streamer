@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/mengelbart/scream-go"
@@ -28,7 +29,7 @@ func (s *ScreamSendWriter) Close() error {
 func NewScreamWriter(ssrc uint, w io.WriteCloser, fb <-chan []byte) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
-	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 2048000, 2048000000)
+	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 512000, 2048000000)
 
 	return &ScreamSendWriter{
 		w:        w,
@@ -81,10 +82,10 @@ func (s *ScreamSendWriter) Run() {
 	timer := time.NewTimer(0)
 	running := false
 	for {
-		//stats := s.screamTx.GetStatistics(GetTimeNTP())
-		//statSlice := strings.Split(stats, ",")
-		//log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
-		//	statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
+		stats := s.screamTx.GetStatistics(GetTimeNTP())
+		statSlice := strings.Split(stats, ",")
+		log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
+			statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 		//log.Println(statSlice)
 		select {
 		case packet := <-s.packet:

@@ -30,7 +30,7 @@ func NewSrcPipeline(w io.WriteCloser, src string) *SrcPipeline {
 	defer srcPipelinesLock.Unlock()
 	id := nextPipelineID
 	nextPipelineID++
-	pipelineStr := src + " ! x264enc name=x264enc ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
+	pipelineStr := src + " ! x264enc name=x264enc bitrate=512 ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
 	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	sp := &SrcPipeline{
 		id:       id,
@@ -80,7 +80,7 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, pipelineID C
 
 	bs := C.GoBytes(buffer, bufferLen)
 	countSrc++
-	log.Printf("%v: writing %v bytes to conn\n", countSrc, len(bs))
+	//log.Printf("%v: writing %v bytes to conn\n", countSrc, len(bs))
 	n, err := io.Copy(srcPipeline.writer, bytes.NewReader(bs))
 	if n != int64(bufferLen) {
 		log.Printf("different buffer size written: %v vs. %v", n, bufferLen)

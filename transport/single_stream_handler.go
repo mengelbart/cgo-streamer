@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/lucas-clemente/quic-go"
@@ -26,6 +25,5 @@ func (o *OneStreamWriter) Write(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Printf("writing %v bytes to pipeline", len(b))
 	return o.stream.Write(b)
 }

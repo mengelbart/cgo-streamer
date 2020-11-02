@@ -1,4 +1,6 @@
 cgo-streamer
-qst
+qrt
+input/
+data/
 sintel/
 .idea/

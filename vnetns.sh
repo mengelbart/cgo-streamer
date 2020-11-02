@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 #set -e
 #set -o pipefail
 
@@ -45,7 +46,6 @@ down() {
 	ip link del br1
 }
 
-
 main() {
 	check_sudo
 	local cmd=$1
@@ -53,6 +53,8 @@ main() {
 		up
 	elif [[ $cmd == "down" ]]; then
 		down
+	else
+		echo "usage: ventns.sh { up | down }"
 	fi
 }
 

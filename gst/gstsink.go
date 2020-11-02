@@ -11,7 +11,7 @@ import (
 )
 
 func CreateSinkPipeline(videoSink string) *SinkPipeline {
-	pipelineStr := "appsrc name=src ! application/x-rtp ! rtpjitterbuffer ! rtph264depay ! h264parse ! avdec_h264 ! " + videoSink
+	pipelineStr := "appsrc name=src ! application/x-rtp ! rtpjitterbuffer ! queue ! rtph264depay ! h264parse ! avdec_h264 ! " + videoSink
 	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	return &SinkPipeline{
 		pipeline: C.go_gst_create_sink_pipeline(C.CString(pipelineStr)),
@@ -51,7 +51,7 @@ var countSink = 0
 
 func (p *SinkPipeline) Write(buffer []byte) (n int, err error) {
 	countSink++
-	log.Printf("%v: writing %v bytes to pipeline\n", countSink, len(buffer))
+	//log.Printf("%v: writing %v bytes to pipeline\n", countSink, len(buffer))
 	b := C.CBytes(buffer)
 	defer C.free(b)
 	C.go_gst_receive_push_buffer(p.pipeline, b, C.int(len(buffer)))

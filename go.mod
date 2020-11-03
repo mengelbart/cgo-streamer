@@ -10,4 +10,4 @@ require (
 	github.com/spf13/cobra v1.0.0
 )
 
-replace github.com/lucas-clemente/quic-go => ../../../../go/src/github.com/lucas-clemente/quic-go
+replace github.com/lucas-clemente/quic-go => github.com/mengelbart/quic-go v0.7.1-0.20201103165947-e65b629c46c0

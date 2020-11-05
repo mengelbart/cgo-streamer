@@ -29,7 +29,7 @@ func (s *ScreamSendWriter) Close() error {
 func NewScreamWriter(ssrc uint, w io.WriteCloser, fb <-chan []byte) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
-	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 512000, 2048000000)
+	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 1024000, 2048000000)
 
 	return &ScreamSendWriter{
 		w:        w,
@@ -58,6 +58,12 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	for {
 		select {
 		case <-ticker.C:
+			log.Printf("len(queue)=%v\n", s.q.Len())
+			stats := s.screamTx.GetStatistics(GetTimeNTP())
+			statSlice := strings.Split(stats, ",")
+			log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
+				statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
+			//log.Println(statSlice)
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
 			if lastBitrate != uint(kbps) {
 				lastBitrate = uint(kbps)
@@ -72,25 +78,23 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	}
 }
 
+var t0 = int64(0)
+
 func GetTimeNTP() uint {
+	//n*(65536 / timeBase) + 100;
 	t := time.Now().Unix()
-	ntp64 := t * 65536
+	ntp64 := t*65536 - t0
 	return uint(ntp64 & 0xFFFFFFFF)
 }
 
 func (s *ScreamSendWriter) Run() {
+	t0 = time.Now().Unix()
 	timer := time.NewTimer(0)
 	running := false
 	for {
-		stats := s.screamTx.GetStatistics(GetTimeNTP())
-		statSlice := strings.Split(stats, ",")
-		log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
-			statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
-		//log.Println(statSlice)
 		select {
 		case packet := <-s.packet:
 			s.q.Push(packet)
-			//log.Println("pushed packet to queue")
 			s.screamTx.NewMediaFrame(GetTimeNTP(), s.ssrc, len(packet.Raw))
 
 		case fb := <-s.feedback:
@@ -180,7 +184,8 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 }
 
 func (s *ScreamReadWriter) Run(fbw io.Writer) {
-	ticker := time.NewTicker(10 * time.Millisecond)
+	t0 = time.Now().Unix()
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {

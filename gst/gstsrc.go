@@ -30,7 +30,7 @@ func NewSrcPipeline(w io.WriteCloser, src string) *SrcPipeline {
 	defer srcPipelinesLock.Unlock()
 	id := nextPipelineID
 	nextPipelineID++
-	pipelineStr := src + " ! x264enc name=x264enc bitrate=512 ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
+	pipelineStr := src + " ! x264enc name=x264enc pass=5 speed-preset=4 bitrate=1024 tune=4 ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
 	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	sp := &SrcPipeline{
 		id:       id,

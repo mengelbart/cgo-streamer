@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/mengelbart/cgo-streamer/gst"
 	"github.com/mengelbart/cgo-streamer/transport"
@@ -17,11 +18,13 @@ var tracer quictrace.Tracer
 
 var VideoSrc string
 var Bitrate int
+var ScreamLogFile string
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
 	serveCmd.Flags().IntVarP(&Bitrate, "bitrate", "b", 2048, "initial encoder bitrate")
+	serveCmd.Flags().StringVar(&ScreamLogFile, "scream-logger", "stdout", "Log file for scream statistics, 'stdout' prints to stdout, otherwise creates a new file")
 }
 
 var serveCmd = &cobra.Command{
@@ -43,6 +46,19 @@ func serve() error {
 		videoSrc: VideoSrc,
 		scream:   Scream,
 		bitrate:  Bitrate,
+	}
+	if Scream {
+		if ScreamLogFile != "stdout" {
+			create, err := os.Create(ScreamLogFile)
+			if err != nil {
+				return err
+			}
+			src.ScreamLogWriter = create
+		} else {
+			src.ScreamLogWriter = os.Stdout
+		}
+	} else {
+		src.ScreamLogWriter = ioutil.Discard
 	}
 	if VideoSrc != "videotestsrc" {
 		src.videoSrc = fmt.Sprintf("filesrc location=%v ! queue ! decodebin ! videoconvert ", VideoSrc)
@@ -76,9 +92,10 @@ func serve() error {
 }
 
 type Src struct {
-	scream   bool
-	videoSrc string
-	bitrate  int
+	scream          bool
+	ScreamLogWriter io.Writer
+	videoSrc        string
+	bitrate         int
 }
 
 func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
@@ -108,7 +125,7 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
 func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	ssrc := uint(1)
-	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb)
+	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, s.ScreamLogWriter)
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)

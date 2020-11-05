@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -12,13 +11,14 @@ import (
 )
 
 type ScreamSendWriter struct {
-	w        io.WriteCloser
-	q        *Queue
-	screamTx *scream.Tx
-	ssrc     uint
-	packet   chan *rtp.Packet
-	feedback <-chan []byte
-	done     chan struct{}
+	w               io.WriteCloser
+	q               *Queue
+	screamTx        *scream.Tx
+	ssrc            uint
+	packet          chan *rtp.Packet
+	feedback        <-chan []byte
+	done            chan struct{}
+	screamLogWriter io.Writer
 }
 
 func (s *ScreamSendWriter) Close() error {
@@ -26,19 +26,20 @@ func (s *ScreamSendWriter) Close() error {
 	return nil
 }
 
-func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte) *ScreamSendWriter {
+func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte, screamLogWriter io.Writer) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
 	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, float64(bitrate*1000), 2048000000)
 
 	return &ScreamSendWriter{
-		w:        w,
-		q:        queue,
-		screamTx: screamTx,
-		ssrc:     ssrc,
-		packet:   make(chan *rtp.Packet, 1024),
-		done:     make(chan struct{}, 1),
-		feedback: fb,
+		w:               w,
+		q:               queue,
+		screamTx:        screamTx,
+		ssrc:            ssrc,
+		packet:          make(chan *rtp.Packet, 1024),
+		done:            make(chan struct{}, 1),
+		feedback:        fb,
+		screamLogWriter: screamLogWriter,
 	}
 }
 
@@ -53,22 +54,20 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 }
 
 func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
-	ticker := time.NewTicker(2000 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 	var lastBitrate uint
+	screamLogger := log.New(s.screamLogWriter, "", log.LstdFlags)
+	screamLogger.Printf("len(queue) cwnd bytesInFlightLog fastStart queueDelay targetBitrate rateTransmitted")
 	for {
 		select {
 		case <-ticker.C:
-			log.Printf("len(queue)=%v\n", s.q.Len())
 			stats := s.screamTx.GetStatistics(GetTimeNTP())
 			statSlice := strings.Split(stats, ",")
-			log.Printf("cwnd: %v, bytesInFlightLog: %v, fastStart: %v, queueDelay: %v, targetBitrate: %v, rateTransmitted: %v\n",
-				statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
-			//log.Println(statSlice)
+			screamLogger.Printf("%v %v %v %v %v %v %v", s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
 			if lastBitrate != uint(kbps) {
 				lastBitrate = uint(kbps)
 				setBitrate(lastBitrate)
-				fmt.Printf("set bitrate to %v kbps\n", lastBitrate)
 			}
 		case <-s.done:
 			log.Println("leaving RunBitrate")

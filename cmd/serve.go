@@ -16,11 +16,12 @@ import (
 var tracer quictrace.Tracer
 
 var VideoSrc string
-var LogRTP bool
+var Bitrate int
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
+	serveCmd.Flags().IntVarP(&Bitrate, "bitrate", "b", 2048, "initial encoder bitrate")
 }
 
 var serveCmd = &cobra.Command{
@@ -41,6 +42,7 @@ func serve() error {
 	src := &Src{
 		videoSrc: VideoSrc,
 		scream:   Scream,
+		bitrate:  Bitrate,
 	}
 	if VideoSrc != "videotestsrc" {
 		src.videoSrc = fmt.Sprintf("filesrc location=%v ! queue ! decodebin ! videoconvert ", VideoSrc)
@@ -76,6 +78,7 @@ func serve() error {
 type Src struct {
 	scream   bool
 	videoSrc string
+	bitrate  int
 }
 
 func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
@@ -87,7 +90,7 @@ func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
 func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
-	p := gst.NewSrcPipeline(w, s.videoSrc)
+	p := gst.NewSrcPipeline(w, s.videoSrc, s.bitrate)
 
 	p.Start()
 	go func() {
@@ -105,9 +108,9 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
 func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	ssrc := uint(1)
-	cc := transport.NewScreamWriter(ssrc, w, fb)
+	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb)
 
-	p := gst.NewSrcPipeline(cc, s.videoSrc)
+	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
 	p.Start()
 	go cc.Run()

@@ -9,6 +9,7 @@ package gst
 import "C"
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -25,12 +26,12 @@ type SrcPipeline struct {
 	writer   io.WriteCloser
 }
 
-func NewSrcPipeline(w io.WriteCloser, src string) *SrcPipeline {
+func NewSrcPipeline(w io.WriteCloser, src string, bitrate int) *SrcPipeline {
 	srcPipelinesLock.Lock()
 	defer srcPipelinesLock.Unlock()
 	id := nextPipelineID
 	nextPipelineID++
-	pipelineStr := src + " ! x264enc name=x264enc pass=5 speed-preset=4 bitrate=1024 tune=4 ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink"
+	pipelineStr := src + fmt.Sprintf(" ! x264enc name=x264enc pass=5 speed-preset=4 bitrate=%v tune=4 ! rtph264pay name=rtph264pay mtu=1000 ! appsink name=appsink", bitrate)
 	log.Printf("creating pipeline: '%v'\n", pipelineStr)
 	sp := &SrcPipeline{
 		id:       id,

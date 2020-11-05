@@ -26,10 +26,10 @@ func (s *ScreamSendWriter) Close() error {
 	return nil
 }
 
-func NewScreamWriter(ssrc uint, w io.WriteCloser, fb <-chan []byte) *ScreamSendWriter {
+func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
-	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, 1024000, 2048000000)
+	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, float64(bitrate*1000), 2048000000)
 
 	return &ScreamSendWriter{
 		w:        w,
@@ -81,7 +81,6 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 var t0 = int64(0)
 
 func GetTimeNTP() uint {
-	//n*(65536 / timeBase) + 100;
 	t := time.Now().Unix()
 	ntp64 := t*65536 - t0
 	return uint(ntp64 & 0xFFFFFFFF)
@@ -158,18 +157,20 @@ func (s *ScreamSendWriter) Run() {
 }
 
 type ScreamReadWriter struct {
-	w          io.Writer
-	screamRx   *scream.Rx
-	packetChan chan *rtp.Packet
-	CloseChan  chan struct{}
+	w                 io.Writer
+	screamRx          *scream.Rx
+	packetChan        chan *rtp.Packet
+	CloseChan         chan struct{}
+	feedbackFrequency time.Duration
 }
 
-func NewScreamReadWriter(w io.Writer) *ScreamReadWriter {
+func NewScreamReadWriter(w io.Writer, feedbackFrequency time.Duration) *ScreamReadWriter {
 	return &ScreamReadWriter{
-		w:          w,
-		screamRx:   scream.NewRx(1),
-		packetChan: make(chan *rtp.Packet, 1024),
-		CloseChan:  make(chan struct{}, 1),
+		w:                 w,
+		screamRx:          scream.NewRx(1),
+		packetChan:        make(chan *rtp.Packet, 1024),
+		CloseChan:         make(chan struct{}, 1),
+		feedbackFrequency: feedbackFrequency,
 	}
 }
 
@@ -185,7 +186,7 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 
 func (s *ScreamReadWriter) Run(fbw io.Writer) {
 	t0 = time.Now().Unix()
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(s.feedbackFrequency)
 	defer ticker.Stop()
 	for {
 		select {

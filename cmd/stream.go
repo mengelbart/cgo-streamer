@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/mengelbart/cgo-streamer/transport"
 
@@ -16,10 +17,12 @@ import (
 )
 
 var VideoSink string
+var FeedbackFreq int
 
 func init() {
 	rootCmd.AddCommand(streamCmd)
 	streamCmd.Flags().StringVar(&VideoSink, "video-sink", "autovideosink", "File to save video")
+	streamCmd.Flags().IntVarP(&FeedbackFreq, "feedback-frequency", "f", 500, "Frequency in which scream feedback is sent in ms (additionally to every incoming packet)")
 }
 
 var streamCmd = &cobra.Command{
@@ -50,7 +53,7 @@ func run() error {
 
 	var client FeedbackRunner
 	if Scream {
-		screamWriter := transport.NewScreamReadWriter(pipeline)
+		screamWriter := transport.NewScreamReadWriter(pipeline, time.Duration(FeedbackFreq)*time.Millisecond)
 		closeChans = append(closeChans, screamWriter.CloseChan)
 		client = newClient(Handler, Addr, screamWriter)
 		sender, c, err := client.RunFeedbackSender()

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,7 @@ var (
 
 func init() {
 	rootCmd.AddCommand(benchmarkCmd)
-	benchmarkCmd.Flags().StringSliceVarP(&InputFiles, "input-file", "f", []string{}, "List of video files to include in test runs")
+	benchmarkCmd.Flags().StringSliceVarP(&InputFiles, "input-files", "f", []string{}, "List of video files to include in test runs. Use \"comma,separated,list\" or add flag multiple times")
 }
 
 var benchmarkCmd = &cobra.Command{
@@ -64,6 +65,14 @@ var handlers = []string{
 	"streamperframe",
 	"datagram",
 }
+var feedbackFrequencies = []time.Duration{
+	50 * time.Millisecond,
+	100 * time.Millisecond,
+	200 * time.Millisecond,
+	300 * time.Millisecond,
+	400 * time.Millisecond,
+	500 * time.Millisecond,
+}
 
 // generate all combination of configurations
 func cartesianConfigs(
@@ -71,36 +80,52 @@ func cartesianConfigs(
 	bws []bitrate,
 	ccs []string,
 	hs []string,
+	ffs []time.Duration,
 ) []*config {
 	lens := []int{len(fs), len(bws), len(ccs), len(hs)}
 	gen := combin.NewCartesianGenerator(lens)
 	var configs []*config
 	for gen.Next() {
 		p := gen.Product(nil)
-		fmt.Println(p)
-		configs = append(configs, &config{
+		c := &config{
 			Filename:          fs[p[0]],
 			Bandwidth:         bws[p[1]],
 			CongestionControl: ccs[p[2]],
 			Handler:           hs[p[3]],
-		})
+		}
+
+		if c.CongestionControl != "none" {
+			for _, ff := range ffs {
+				cf := &config{
+					Filename:          c.Filename,
+					Bandwidth:         c.Bandwidth,
+					CongestionControl: c.CongestionControl,
+					Handler:           c.Handler,
+					FeedbackFrequency: ff,
+				}
+				configs = append(configs, cf)
+			}
+		} else {
+			configs = append(configs, c)
+		}
 	}
 	return initConfigs(configs)
 }
 
 type config struct {
-	Filename          string  `json:"filename"`
-	AbsFile           string  `json:"absoluteFilename"`
-	BaseFile          string  `json:"baseFilename"`
-	Bandwidth         bitrate `json:"bandwidth"`
-	CongestionControl string  `json:"congestionControl"`
-	Handler           string  `json:"handler"`
+	Filename          string        `json:"filename"`
+	AbsFile           string        `json:"absolute_filename"`
+	BaseFile          string        `json:"base_filename"`
+	Bandwidth         bitrate       `json:"bandwidth"`
+	CongestionControl string        `json:"congestion_control"`
+	Handler           string        `json:"handler"`
+	FeedbackFrequency time.Duration `json:"feedback_frequency"`
 
 	Version string `json:"version"`
 }
 
 func (c config) String() string {
-	return fmt.Sprintf("%v-%v-%v-%v", c.BaseFile, c.Bandwidth, c.CongestionControl, c.Handler)
+	return fmt.Sprintf("%v-%v-%v-%v-%v", c.BaseFile, c.Handler, c.Bandwidth, c.CongestionControl, c.FeedbackFrequency)
 }
 
 func (c config) serveCmd() []string {
@@ -116,6 +141,7 @@ func (c config) serveCmd() []string {
 
 	if c.CongestionControl == "scream" {
 		cmd = append(cmd, "-s")
+		cmd = append(cmd, "--scream-logger", "scream.log")
 	}
 	return cmd
 }
@@ -133,6 +159,7 @@ func (c config) clientCmd() []string {
 
 	if c.CongestionControl == "scream" {
 		cmd = append(cmd, "-s")
+		cmd = append(cmd, "--feedback-frequency", fmt.Sprintf("%v", int64(c.FeedbackFrequency)))
 	}
 	return cmd
 }
@@ -187,12 +214,13 @@ func benchmark() {
 		panic(err)
 	}
 
-	cs := cartesianConfigs(InputFiles, bandwidths, congestionControllers, handlers)
+	cs := cartesianConfigs(InputFiles, bandwidths, congestionControllers, handlers, feedbackFrequencies)
 
 	err = os.Chdir(expDir)
 	if err != nil {
 		panic(err)
 	}
+	log.Printf("running %v configs", len(cs))
 	for _, c := range cs {
 		func() {
 			err = os.Mkdir(c.String(), os.ModePerm)
@@ -274,6 +302,13 @@ func benchmark() {
 			if err != nil {
 				fmt.Printf("could not run stream client: %v\n", err)
 			}
+			defer func() {
+				f := fmt.Sprintf("streamed-%v", c.BaseFile)
+				err := os.Remove(f)
+				if err != nil {
+					fmt.Printf("could not remove file %v: %v\n", f, err)
+				}
+			}()
 
 			ffmpegLog := "ffmpeg.log"
 			ffmpegLogFile, err := os.Create(ffmpegLog)

@@ -27,9 +27,17 @@ def plot_psnr(file):
     plt.suptitle(file)
     plt.savefig('psnr.png')
 
+def plot_scream(file):
+    df=pd.read_csv('scream.log', sep="\s+|\t+|\s+\t+|\t+\s+", engine='python', names=['date', 'time', 'queueLen', 'cwnd', 'bytesInFlight', 'fastStart', 'queueDelay', 'targ
+    ...: etBitrate', 'rateTransmitted'])
+    df.plot(x='time', y=['queueLen', 'cwnd', 'bytesInFlight', 'targetBitrate', 'rateTransmitted'])
+    plt.savefig('scream.png')
+
 def main():
     plot_ssim("ssim.log")
     plot_psnr("psnr.log")
+    if os.path.isFile("scream.log"):
+        plot_scream("scream.log")
 
 
 if __name__ == "__main__":

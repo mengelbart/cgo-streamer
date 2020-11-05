@@ -57,7 +57,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	var lastBitrate uint
 	screamLogger := log.New(s.screamLogWriter, "", log.LstdFlags)
-	screamLogger.Printf("len(queue) cwnd bytesInFlightLog fastStart queueDelay targetBitrate rateTransmitted")
+	//screamLogger.Printf("len(queue) cwnd bytesInFlightLog fastStart queueDelay targetBitrate rateTransmitted")
 	for {
 		select {
 		case <-ticker.C:

@@ -8,6 +8,7 @@ require (
 	github.com/pion/rtcp v1.2.4
 	github.com/pion/rtp v1.6.1
 	github.com/spf13/cobra v1.0.0
+	gonum.org/v1/gonum v0.8.1
 )
 
 replace github.com/lucas-clemente/quic-go => github.com/mengelbart/quic-go v0.7.1-0.20201103165947-e65b629c46c0

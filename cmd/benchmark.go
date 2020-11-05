@@ -11,17 +11,21 @@ import (
 	"strconv"
 	"time"
 
+	"gonum.org/v1/gonum/stat/combin"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	Version   string
-	Commit    string
-	Timestamp string
+	Version    string
+	Commit     string
+	Timestamp  string
+	InputFiles []string
 )
 
 func init() {
 	rootCmd.AddCommand(benchmarkCmd)
+	benchmarkCmd.Flags().StringSliceVarP(&InputFiles, "input-file", "f", []string{}, "List of video files to include in test runs")
 }
 
 var benchmarkCmd = &cobra.Command{
@@ -41,7 +45,48 @@ type bitrate int64
 const (
 	bitPerSecond  bitrate = 1
 	kBitPerSecond         = 1000 * bitPerSecond
+	mBitPerSecond         = 1000 * kBitPerSecond
 )
+
+var bandwidths = []bitrate{
+	1 * mBitPerSecond,
+	2 * mBitPerSecond,
+	3 * mBitPerSecond,
+	4 * mBitPerSecond,
+	5 * mBitPerSecond,
+}
+var congestionControllers = []string{
+	"none",
+	"scream",
+}
+var handlers = []string{
+	"udp",
+	"streamperframe",
+	"datagram",
+}
+
+// generate all combination of configurations
+func cartesianConfigs(
+	fs []string,
+	bws []bitrate,
+	ccs []string,
+	hs []string,
+) []*config {
+	lens := []int{len(fs), len(bws), len(ccs), len(hs)}
+	gen := combin.NewCartesianGenerator(lens)
+	var configs []*config
+	for gen.Next() {
+		p := gen.Product(nil)
+		fmt.Println(p)
+		configs = append(configs, &config{
+			Filename:          fs[p[0]],
+			Bandwidth:         bws[p[1]],
+			CongestionControl: ccs[p[2]],
+			Handler:           hs[p[3]],
+		})
+	}
+	return initConfigs(configs)
+}
 
 type config struct {
 	Filename          string  `json:"filename"`
@@ -90,21 +135,6 @@ func (c config) clientCmd() []string {
 		cmd = append(cmd, "-s")
 	}
 	return cmd
-}
-
-var configs = []*config{
-	{
-		Filename:          "input/Sintel_480_snippet_yuv.mkv",
-		Bandwidth:         1000 * kBitPerSecond,
-		CongestionControl: "scream",
-		Handler:           "datagram",
-	},
-	{
-		Filename:          "input/Sintel_480_snippet_yuv.mkv",
-		Bandwidth:         1000 * kBitPerSecond,
-		CongestionControl: "scream",
-		Handler:           "udp",
-	},
 }
 
 func initConfigs(raw []*config) []*config {
@@ -157,7 +187,7 @@ func benchmark() {
 		panic(err)
 	}
 
-	cs := initConfigs(configs)
+	cs := cartesianConfigs(InputFiles, bandwidths, congestionControllers, handlers)
 
 	err = os.Chdir(expDir)
 	if err != nil {

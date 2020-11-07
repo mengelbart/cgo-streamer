@@ -58,7 +58,7 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	var lastBitrate uint
-	screamLogger := log.New(s.screamLogWriter, "", log.LstdFlags)
+	screamLogger := log.New(s.screamLogWriter, "", 0)
 	//screamLogger.Printf("len(queue) cwnd bytesInFlightLog fastStart queueDelay targetBitrate rateTransmitted")
 	for {
 		select {

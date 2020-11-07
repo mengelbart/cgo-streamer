@@ -62,16 +62,13 @@ var congestionControllers = []string{
 }
 var handlers = []string{
 	"udp",
-	"streamperframe",
+	//"streamperframe",
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
-	50 * time.Millisecond,
 	100 * time.Millisecond,
 	200 * time.Millisecond,
 	300 * time.Millisecond,
-	400 * time.Millisecond,
-	500 * time.Millisecond,
 }
 
 // generate all combination of configurations

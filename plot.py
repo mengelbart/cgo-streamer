@@ -14,7 +14,7 @@ def plot_ssim(file, title):
     df[np.isfinite(df)]['ssim'].plot(ax=axes[0])
     df[np.isfinite(df)]['ssim'].hist(cumulative=True, bins=len(df['ssim'].unique()), ax=axes[1])
 
-    plt.suptitle(title)
+    plt.suptitle('ssim: ' + title)
     plt.savefig('ssim.png')
 
 def plot_psnr(file, title):
@@ -25,7 +25,7 @@ def plot_psnr(file, title):
     df[np.isfinite(df)]['psnr'].plot(ax=axes[0])
     df[np.isfinite(df)]['psnr'].hist(cumulative=True, bins=len(df['psnr'].unique()), ax=axes[1])
 
-    plt.suptitle(title)
+    plt.suptitle('psnr: ' + title)
     plt.savefig('psnr.png')
 
 def plot_scream(file, title):

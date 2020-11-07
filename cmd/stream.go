@@ -55,7 +55,7 @@ func run() error {
 	if Scream {
 		screamWriter := transport.NewScreamReadWriter(pipeline, time.Duration(FeedbackFreq)*time.Millisecond)
 		closeChans = append(closeChans, screamWriter.CloseChan)
-		client = newClient(Handler, Addr, screamWriter)
+		client = newClient(Handler, Addr, screamWriter, QLOGFile)
 		sender, c, err := client.RunFeedbackSender()
 		if err != nil {
 			return err
@@ -63,7 +63,7 @@ func run() error {
 		closeChans = append(closeChans, c)
 		go screamWriter.Run(sender)
 	} else {
-		client = newClient(Handler, Addr, pipeline)
+		client = newClient(Handler, Addr, pipeline, QLOGFile)
 	}
 	closeChans = append(closeChans, client.CloseChan())
 
@@ -101,15 +101,15 @@ type FeedbackRunner interface {
 	CloseChan() chan struct{}
 }
 
-func newClient(handler string, addr string, w io.Writer) FeedbackRunner {
+func newClient(handler string, addr string, w io.Writer, qlogFile string) FeedbackRunner {
 	switch handler {
 	case "udp":
 		return transport.NewUDPClient(addr, w)
 	case "streamperframe":
-		return transport.NewQUICClient(addr, w, false)
+		return transport.NewQUICClient(addr, w, false, qlogFile)
 	case "datagram":
 		fallthrough
 	default:
-		return transport.NewQUICClient(addr, w, true)
+		return transport.NewQUICClient(addr, w, true, qlogFile)
 	}
 }

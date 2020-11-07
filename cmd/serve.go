@@ -66,6 +66,9 @@ func serve() error {
 
 	var runner Runner
 	var options []func(*transport.QUICServer)
+	if len(QLOGFile) > 0 {
+		options = append(options, transport.EnableQLOG(QLOGFile))
+	}
 	switch Handler {
 	case "udp":
 		runner = transport.NewUDPServer(Addr, transport.SetPacketHandler(transport.NewUDPPacketHandler(src)))

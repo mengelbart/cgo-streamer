@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -8,6 +9,10 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
+
+	"github.com/lucas-clemente/quic-go/logging"
+	"github.com/lucas-clemente/quic-go/qlog"
 
 	"github.com/lucas-clemente/quic-go"
 )
@@ -26,8 +31,8 @@ var tlsConf = &tls.Config{
 	NextProtos:         []string{"quic-realtime"},
 }
 
-func NewQUICClient(addr string, w io.Writer, dgram bool) *QUICClient {
-	return &QUICClient{
+func NewQUICClient(addr string, w io.Writer, dgram bool, qlogFile string) *QUICClient {
+	qc := &QUICClient{
 		dgram: dgram,
 		addr:  addr,
 		config: &quic.Config{
@@ -37,6 +42,17 @@ func NewQUICClient(addr string, w io.Writer, dgram bool) *QUICClient {
 		writer:    w,
 		closeChan: make(chan struct{}, 1),
 	}
+	if len(qlogFile) > 0 {
+		qc.config.Tracer = qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+			f, err := os.Create(qlogFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("Creating qlog file %s.\n", qlogFile)
+			return newBufferedWriteCloser(bufio.NewWriter(f), f)
+		})
+	}
+	return qc
 }
 
 type FeedbackWriter chan []byte

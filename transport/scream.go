@@ -59,13 +59,14 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	var lastBitrate uint
 	screamLogger := log.New(s.screamLogWriter, "", 0)
+	start := time.Now()
 	//screamLogger.Printf("len(queue) cwnd bytesInFlightLog fastStart queueDelay targetBitrate rateTransmitted")
 	for {
 		select {
 		case <-ticker.C:
 			stats := s.screamTx.GetStatistics(uint(gst.GetTimeInNTP()))
 			statSlice := strings.Split(stats, ",")
-			screamLogger.Printf("%v %v %v %v %v %v %v", s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
+			screamLogger.Printf("%v %v %v %v %v %v %v %v", time.Since(start).Milliseconds(), s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
 			if lastBitrate != uint(kbps) {
 				lastBitrate = uint(kbps)

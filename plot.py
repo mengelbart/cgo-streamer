@@ -30,11 +30,13 @@ def plot_psnr(file, title):
 
 def plot_scream(file, title):
     df=pd.read_csv('scream.log', sep="\s+|\t+|\s+\t+|\t+\s+", engine='python',
-            names=['date', 'time', 'queueLen', 'cwnd', 'bytesInFlight', 'fastStart', 'queueDelay', 'targetBitrate', 'rateTransmitted'])
+            names=['time', 'queueLen', 'cwnd', 'bytesInFlight', 'fastStart', 'queueDelay', 'targetBitrate', 'rateTransmitted'])
 
-    fig, axes = plt.subplots(nrows=1, ncols=1)
+    fig, axes = plt.subplots(nrows=3, ncols=1)
 
-    df.plot(x='time', y=['queueLen', 'cwnd', 'bytesInFlight', 'targetBitrate', 'rateTransmitted'])
+    df.sort_values('time').plot(x='time', y=['cwnd', 'bytesInFlight'], ax=axes[0])
+    df.sort_values('time').plot(x='time', y=['targetBitrate', 'rateTransmitted'], ax=axes[1])
+    df.sort_values('time').plot(x='time', y=['queueLen'], ax=axes[2])
 
     plt.suptitle('scream: ' + title)
     plt.savefig('scream.png')

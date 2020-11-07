@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mengelbart/cgo-streamer/gst"
+
 	"github.com/mengelbart/scream-go"
 	"github.com/pion/rtp"
 )
@@ -61,7 +63,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	for {
 		select {
 		case <-ticker.C:
-			stats := s.screamTx.GetStatistics(GetTimeNTP())
+			stats := s.screamTx.GetStatistics(uint(gst.GetTimeInNTP()))
 			statSlice := strings.Split(stats, ",")
 			screamLogger.Printf("%v %v %v %v %v %v %v", s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
@@ -77,26 +79,18 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	}
 }
 
-var t0 = int64(0)
-
-func GetTimeNTP() uint {
-	t := time.Now().Unix()
-	ntp64 := t*65536 - t0
-	return uint(ntp64 & 0xFFFFFFFF)
-}
-
 func (s *ScreamSendWriter) Run() {
-	t0 = time.Now().Unix()
+	gst.InitT0()
 	timer := time.NewTimer(0)
 	running := false
 	for {
 		select {
 		case packet := <-s.packet:
 			s.q.Push(packet)
-			s.screamTx.NewMediaFrame(GetTimeNTP(), s.ssrc, len(packet.Raw))
+			s.screamTx.NewMediaFrame(uint(gst.GetTimeInNTP()), s.ssrc, len(packet.Raw))
 
 		case fb := <-s.feedback:
-			s.screamTx.IncomingStandardizedFeedback(GetTimeNTP(), fb)
+			s.screamTx.IncomingStandardizedFeedback(uint(gst.GetTimeInNTP()), fb)
 
 		case <-timer.C:
 			running = false
@@ -119,7 +113,7 @@ func (s *ScreamSendWriter) Run() {
 			//log.Println("timer running, continue")
 			continue
 		}
-		dT := s.screamTx.IsOkToTransmit(GetTimeNTP(), s.ssrc)
+		dT := s.screamTx.IsOkToTransmit(uint(gst.GetTimeInNTP()), s.ssrc)
 		if dT == -1 {
 			//log.Printf("not ok to transmit: send window full or no packets to transmit, waiting")
 			continue
@@ -141,7 +135,7 @@ func (s *ScreamSendWriter) Run() {
 		}
 		//log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
 		dT = s.screamTx.AddTransmitted(
-			GetTimeNTP(),
+			uint(gst.GetTimeInNTP()),
 			uint(packet.SSRC),
 			len(packet.Raw),
 			uint(packet.SequenceNumber),
@@ -184,14 +178,14 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 }
 
 func (s *ScreamReadWriter) Run(fbw io.Writer) {
-	t0 = time.Now().Unix()
+	gst.InitT0()
 	ticker := time.NewTicker(s.feedbackFrequency)
 	defer ticker.Stop()
 	for {
 		select {
 		case p := <-s.packetChan:
 			s.screamRx.Receive(
-				GetTimeNTP(),
+				uint(gst.GetTimeInNTP()),
 				nil,
 				int(p.SSRC),
 				len(p.Raw),
@@ -203,7 +197,7 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 			return
 		}
 		if ok, feedback := s.screamRx.CreateStandardizedFeedback(
-			GetTimeNTP(),
+			uint(gst.GetTimeInNTP()),
 			true,
 		); ok {
 			_, err := fbw.Write(feedback)

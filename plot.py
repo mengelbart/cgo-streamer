@@ -12,7 +12,7 @@ def plot_ssim(file, title):
     fig, axes = plt.subplots(nrows=1, ncols=2)
 
     df[np.isfinite(df)]['ssim'].plot(ax=axes[0])
-    df[np.isfinite(df)]['ssim'].hist(cumulative=True, bins=len(df['ssim'].unique()), ax=axes[1])
+    df[np.isfinite(df)]['ssim'].hist(cumulative=True, bins=len(df['ssim']), density=True, ax=axes[1])
 
     plt.suptitle('ssim: ' + title)
     plt.savefig('ssim.png')
@@ -23,7 +23,7 @@ def plot_psnr(file, title):
     fig, axes = plt.subplots(nrows=1, ncols=2)
 
     df[np.isfinite(df)]['psnr'].plot(ax=axes[0])
-    df[np.isfinite(df)]['psnr'].hist(cumulative=True, bins=len(df['psnr'].unique()), ax=axes[1])
+    df[np.isfinite(df)]['psnr'].hist(cumulative=True, bins=len(df['psnr']), density=True, ax=axes[1])
 
     plt.suptitle('psnr: ' + title)
     plt.savefig('psnr.png')

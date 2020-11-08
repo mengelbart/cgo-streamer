@@ -177,9 +177,6 @@ func initConfigs(raw []*config) []*config {
 			panic(err)
 		}
 		base := filepath.Base(c.Filename)
-		if err != nil {
-			panic(err)
-		}
 		c.AbsFile = abs
 		c.BaseFile = base
 
@@ -304,9 +301,9 @@ func benchmark() {
 			stream := exec.Command("ip", append([]string{"netns", "exec", "ns2", bin}, c.clientCmd()...)...)
 			stream.Stdout = clientLogFile
 			stream.Stderr = clientLogFile
-			err = stream.Run()
+			err = stream.Start()
 			if err != nil {
-				fmt.Printf("could not run stream client: %v\n", err)
+				fmt.Printf("could not start stream client: %v\n", err)
 			}
 			defer func() {
 				f := fmt.Sprintf("streamed-%v", c.BaseFile)
@@ -315,6 +312,22 @@ func benchmark() {
 					fmt.Printf("could not remove file %v: %v\n", f, err)
 				}
 			}()
+
+			done := make(chan error, 1)
+			go func() {
+				done <- stream.Wait()
+			}()
+			select {
+			case <-time.After(5 * time.Minute):
+				if err := stream.Process.Kill(); err != nil {
+					fmt.Printf("could not kill process: %v\n", err)
+				}
+				fmt.Printf("stream client process killed after timeout")
+			case err := <-done:
+				if err != nil {
+					fmt.Printf("stream client process finished with error: %v\n", err)
+				}
+			}
 
 			ffmpegLog := "ffmpeg.log"
 			ffmpegLogFile, err := os.Create(ffmpegLog)

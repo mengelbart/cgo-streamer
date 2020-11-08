@@ -51,10 +51,13 @@ const (
 
 var bandwidths = []bitrate{
 	1 * mBitPerSecond,
-	2 * mBitPerSecond,
 	3 * mBitPerSecond,
-	4 * mBitPerSecond,
 	5 * mBitPerSecond,
+	10 * mBitPerSecond,
+	20 * mBitPerSecond,
+	30 * mBitPerSecond,
+	40 * mBitPerSecond,
+	50 * mBitPerSecond,
 }
 var congestionControllers = []string{
 	"none",
@@ -62,13 +65,15 @@ var congestionControllers = []string{
 }
 var handlers = []string{
 	"udp",
-	//"streamperframe",
+	"streamperframe",
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
 	100 * time.Millisecond,
 	200 * time.Millisecond,
 	300 * time.Millisecond,
+	400 * time.Millisecond,
+	500 * time.Millisecond,
 }
 
 // generate all combination of configurations

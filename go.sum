@@ -124,8 +124,8 @@ github.com/marten-seemann/qtls-go1-15 v0.1.1/go.mod h1:GyFwywLKkRt+6mfU99csTEY1j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mengelbart/quic-go v0.7.1-0.20201107094608-fd5504eeef3c h1:rFcBRYq4Xwf9C/Sx9ivqexT1UhlRURhsZh84F9lrlCo=
 github.com/mengelbart/quic-go v0.7.1-0.20201107094608-fd5504eeef3c/go.mod h1:CxWHmRZdj+y4bsJBPCPWdpJW5VLLF2qqESpjfftnjNk=
-github.com/mengelbart/scream-go v0.0.0-20201103165048-0bc86804749f h1:pC6+gJf3yyLeqAVqqJlSMzYFfWEHfVnuNcL2bamqJM0=
-github.com/mengelbart/scream-go v0.0.0-20201103165048-0bc86804749f/go.mod h1:Yre6kUFLW62SKaIjBBZF/E93fEBqcCqn6bZyrjljd5k=
+github.com/mengelbart/scream-go v0.0.0-20201112103702-e3ca855ff2d4 h1:HYSvnrKtUBDy0IiPAlMtqRz5cQe2tlgRPpQLBhUHFm0=
+github.com/mengelbart/scream-go v0.0.0-20201112103702-e3ca855ff2d4/go.mod h1:Yre6kUFLW62SKaIjBBZF/E93fEBqcCqn6bZyrjljd5k=
 github.com/microcosm-cc/bluemonday v1.0.1/go.mod h1:hsXNsILzKxV+sX77C5b8FSuKF00vh2OMYv+xgHpAMF4=
 github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=

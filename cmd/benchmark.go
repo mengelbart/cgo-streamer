@@ -226,6 +226,7 @@ func benchmark() {
 	log.Printf("running %v configs", len(cs))
 	for _, c := range cs {
 		func() {
+			time.Sleep(30 * time.Second)
 			err = os.Mkdir(c.String(), os.ModePerm)
 			if err != nil {
 				panic(err)
@@ -318,7 +319,7 @@ func benchmark() {
 				done <- stream.Wait()
 			}()
 			select {
-			case <-time.After(5 * time.Minute):
+			case <-time.After(3 * time.Minute):
 				if err := stream.Process.Kill(); err != nil {
 					fmt.Printf("could not kill process: %v\n", err)
 				}

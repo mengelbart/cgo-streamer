@@ -69,6 +69,8 @@ var handlers = []string{
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
+	10 * time.Millisecond,
+	50 * time.Millisecond,
 	100 * time.Millisecond,
 	200 * time.Millisecond,
 	300 * time.Millisecond,

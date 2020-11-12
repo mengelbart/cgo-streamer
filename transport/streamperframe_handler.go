@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -70,13 +71,19 @@ func (m *StreamPerFrameSession) AcceptFeedback() error {
 		return err
 	}
 	log.Println("accepted feedback stream")
+	var size int32
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered from AcceptFeedback: %v\nread size of %v\n", r, size)
+			panic(r)
+		}
+	}()
 	for {
 		select {
 		case <-m.done:
 			return nil
 		default:
 		}
-		var size int32
 		err := binary.Read(fbStream, binary.BigEndian, &size)
 		if err != nil {
 			log.Println(err)

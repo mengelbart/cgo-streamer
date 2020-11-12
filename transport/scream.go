@@ -68,6 +68,10 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 			statSlice := strings.Split(stats, ",")
 			screamLogger.Printf("%v %v %v %v %v %v %v %v", time.Since(start).Milliseconds(), s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
+			if kbps <= 0 {
+				log.Println("skipping setBitrate to 0")
+				continue
+			}
 			if lastBitrate != uint(kbps) {
 				lastBitrate = uint(kbps)
 				setBitrate(lastBitrate)

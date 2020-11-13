@@ -226,7 +226,7 @@ func benchmark() {
 	log.Printf("running %v configs", len(cs))
 	for _, c := range cs {
 		func() {
-			time.Sleep(30 * time.Second)
+			time.Sleep(10 * time.Second)
 			err = os.Mkdir(c.String(), os.ModePerm)
 			if err != nil {
 				panic(err)

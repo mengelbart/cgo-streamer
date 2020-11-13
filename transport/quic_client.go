@@ -84,7 +84,7 @@ func (c *QUICClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 					return err
 				}
 			}
-			err := binary.Write(fbStream, binary.BigEndian, int32(len(fb)))
+			err := binary.Write(fbStream, binary.BigEndian, uint32(len(fb)))
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,10 @@ func (c *QUICClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 		for {
 			select {
 			case fb := <-fbw:
-				fbSender(fb)
+				err := fbSender(fb)
+				if err != nil {
+					log.Println(err)
+				}
 			case <-done:
 				return
 			}

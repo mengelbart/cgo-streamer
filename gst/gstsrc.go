@@ -63,6 +63,7 @@ func (p *SrcPipeline) SetSSRC(ssrc uint) {
 }
 
 func (p *SrcPipeline) SetBitRate(bitrate uint) {
+	log.Printf("set bitrate to %v\n", bitrate)
 	C.go_gst_set_bitrate(p.pipeline, C.uint(bitrate))
 }
 

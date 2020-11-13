@@ -71,7 +71,7 @@ func (m *StreamPerFrameSession) AcceptFeedback() error {
 		return err
 	}
 	log.Println("accepted feedback stream")
-	var size int32
+	var size uint32
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Recovered from AcceptFeedback: %v\nread size of %v\n", r, size)

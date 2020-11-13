@@ -69,7 +69,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 			screamLogger.Printf("%v %v %v %v %v %v %v %v", time.Since(start).Milliseconds(), s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
 			if kbps <= 0 {
-				log.Println("skipping setBitrate to 0")
+				log.Printf("skipping setBitrate to %v\n", kbps)
 				continue
 			}
 			if lastBitrate != uint(kbps) {
@@ -198,17 +198,17 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 				0,
 			)
 		case <-ticker.C:
+			if ok, feedback := s.screamRx.CreateStandardizedFeedback(
+				uint(gst.GetTimeInNTP()),
+				true,
+			); ok {
+				_, err := fbw.Write(feedback)
+				if err != nil {
+					log.Println(err)
+				}
+			}
 		case <-s.CloseChan:
 			return
-		}
-		if ok, feedback := s.screamRx.CreateStandardizedFeedback(
-			uint(gst.GetTimeInNTP()),
-			true,
-		); ok {
-			_, err := fbw.Write(feedback)
-			if err != nil {
-				log.Println(err)
-			}
 		}
 	}
 }

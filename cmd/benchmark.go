@@ -133,6 +133,7 @@ func (c config) String() string {
 func (c config) serveCmd() []string {
 	cmd := []string{
 		"serve",
+		"-v",
 		"-a",
 		addr,
 		"--qlog",
@@ -153,6 +154,7 @@ func (c config) serveCmd() []string {
 func (c config) clientCmd() []string {
 	cmd := []string{
 		"stream",
+		"-v",
 		"-a",
 		addr,
 		"--qlog",

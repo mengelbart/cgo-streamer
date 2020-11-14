@@ -6,40 +6,39 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas as pd
 import numpy as np
+import argparse
+import glob
+import re
+import itertools
+import matplotlib as mpl
+import os
+mpl.rcParams['figure.dpi'] = 100
 
-def plot_psnr(exps):
+FILE = 0
+TRANSPORT = 1
+BANDWIDTH = 2
+CONGESTION_CONTROL = 3
+FEEDBACK_FREQUENCY = 4
 
-    fig, axs = plt.subplots(len(exps[0]), 2 * len(exps), sharex='col', figsize=(30, 30), dpi=300)
-    for j in range(len(exps)):
-        for i in range(len(exps[0])):
-            file=exps[j][i]['path']
-            df=pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[1, 11], names=['n', 'psnr'])
-            df[np.isfinite(df)]['psnr'].plot(ax=axs[i, 2*j])
-            df[np.isfinite(df)]['psnr'].hist(cumulative=True, bins=len(df['psnr']), density=True, ax=axs[i, 2*j + 1])
-            axs[i, 2*j].set_title(file.parts[-2].split('mkv-')[-1])
-            axs[i, 2*j + 1].set_title(file.parts[-2].split('mkv-')[-1])
 
-    fig.tight_layout()
-    return fig
+def get_log_paths(path, metric):
+    exps = []
+    for log in Path(path).rglob('*' + metric + '.log'):
+        exps.append({ 'path': log, 'params': log.parts[-2].split('-')})
+    return exps
 
-def plot_ssim(exps):
-
-    fig, axs = plt.subplots(len(exps[0]), 2 * len(exps), sharex='col', figsize=(30, 30), dpi=300)
-    for j in range(len(exps)):
-        for i in range(len(exps[0])):
-            file=exps[j][i]['path']
-            df=pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[1, 9], names=['n', 'ssim'])
-            df[np.isfinite(df)]['ssim'].plot(ax=axs[i, 2*j])
-            df[np.isfinite(df)]['ssim'].hist(cumulative=True, bins=len(df['ssim']), density=True, ax=axs[i, 2*j + 1])
-            axs[i, 2*j].set_title(file.parts[-2].split('mkv-')[-1])
-            axs[i, 2*j + 1].set_title(file.parts[-2].split('mkv-')[-1])
-
-    fig.tight_layout()
-    return fig
+def get_df(file, metric, col_names=[]):
+    if metric == 'ssim':
+        return pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[1, 9], names=['n', metric])
+    elif metric == 'psnr':
+        return pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[1, 11], names=['n', metric])
+    elif metric == 'box_ssim':
+        return pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[9], names=col_names)
+    elif metric == 'box_psnr':
+        return pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[11], names=col_names)
 
 def plot_scream(exps):
-
-    fig, axs = plt.subplots(3 * len(exps[0]), len(exps), sharex='col', figsize=(30, 30), dpi=300)
+    fig, axs = plt.subplots(3 * len(exps[0]), len(exps), sharex=True, sharey='row', figsize=(30, 30), dpi=300)
     for j in range(len(exps)):
             for i in range(len(exps[0])):
                 file=exps[j][i]['path']
@@ -52,147 +51,115 @@ def plot_scream(exps):
 
                 axs[i * 3, j].set_title(file.parts[-2].split('mkv-')[-1])
 
-    fig.tight_layout()
+    plot.tight_layout()
+    cdf.tight_layout()
     return fig
 
-def get_figures(metric):
-    exps = []
-    for path in Path('data/9a4fbd8/net05/').rglob('*' + metric + '.log'):
-        exps.append({ 'path': path, 'params': path.parts[-2].split('-')})
+def plot_metric(exps, base_path, metric):
 
-    udp_no_cc = sorted([e for e in exps if e['params'][1] == 'udp' and e['params'][3] == 'none'], key=lambda k: k['params'][2])
-    udp_scream_100 = sorted([
-        e for e in exps if
-        e['params'][1] == 'udp' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '100ms'], key=lambda k: k['params'][2])
-    udp_scream_200 = sorted([
-        e for e in exps if
-        e['params'][1] == 'udp' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '200ms'], key=lambda k: k['params'][2])
-    udp_scream_300 = sorted([
-        e for e in exps if
-        e['params'][1] == 'udp' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '300ms'], key=lambda k: k['params'][2])
-    udp_scream_400 = sorted([
-        e for e in exps if
-        e['params'][1] == 'udp' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '400ms'], key=lambda k: k['params'][2])
-    udp_scream_500 = sorted([
-        e for e in exps if
-        e['params'][1] == 'udp' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '500ms'], key=lambda k: k['params'][2])
+    plot, plot_axs = plt.subplots(len(exps[0]), len(exps), sharex=True, sharey=True, figsize=(30, 30), dpi=300)
+    cdf, cdf_axs = plt.subplots(len(exps[0]), len(exps), sharex=True, sharey=True, figsize=(30, 30), dpi=300)
+    for j in range(len(exps)):
+        for i in range(len(exps[0])):
+            c = exps[j][i]
+            print(c)
+            name = '{}-{}-{}-{}-{}'.format(
+                c[FILE],
+                c[TRANSPORT],
+                c[BANDWIDTH],
+                c[CONGESTION_CONTROL],
+                c[FEEDBACK_FREQUENCY]
+            )
+            file = Path(base_path + name + '/'+ metric + '.log')
+            df = pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[11], names=[col_name])
+            df[np.isfinite(df)][metric].plot(ax=plot_axs[i, j])
+            df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
+            plot_axs[i, j].set_title('plot: ' + name)
+            cdf_axs[i, j].set_title('cdf: ' + name)
 
-    datagram_no_cc = sorted([e for e in exps if e['params'][1] == 'datagram' and e['params'][3] == 'none'], key=lambda k: k['params'][2])
-    datagram_scream_100 = sorted([
-        e for e in exps if
-        e['params'][1] == 'datagram' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '100ms'], key=lambda k: k['params'][2])
-    datagram_scream_200 = sorted([
-        e for e in exps if
-        e['params'][1] == 'datagram' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '200ms'], key=lambda k: k['params'][2])
-    datagram_scream_300 = sorted([
-        e for e in exps if
-        e['params'][1] == 'datagram' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '300ms'], key=lambda k: k['params'][2])
-    datagram_scream_400 = sorted([
-        e for e in exps if
-        e['params'][1] == 'datagram' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '400ms'], key=lambda k: k['params'][2])
-    datagram_scream_500 = sorted([
-        e for e in exps if
-        e['params'][1] == 'datagram' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '500ms'], key=lambda k: k['params'][2])
+    plot.tight_layout()
+    cdf.tight_layout()
+    return plot, cdf
 
-    streamperframe_no_cc = sorted([e for e in exps if e['params'][1] == 'streamperframe' and e['params'][3] == 'none'], key=lambda k: k['params'][2])
-    streamperframe_scream_100 = sorted([
-        e for e in exps if
-        e['params'][1] == 'streamperframe' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '100ms'], key=lambda k: k['params'][2])
-    streamperframe_scream_200 = sorted([
-        e for e in exps if
-        e['params'][1] == 'streamperframe' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '200ms'], key=lambda k: k['params'][2])
-    streamperframe_scream_300 = sorted([
-        e for e in exps if
-        e['params'][1] == 'streamperframe' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '300ms'], key=lambda k: k['params'][2])
-    streamperframe_scream_400 = sorted([
-        e for e in exps if
-        e['params'][1] == 'streamperframe' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '400ms'], key=lambda k: k['params'][2])
-    streamperframe_scream_500 = sorted([
-        e for e in exps if
-        e['params'][1] == 'streamperframe' and
-        e['params'][3] == 'scream' and
-        e['params'][4] == '500ms'], key=lambda k: k['params'][2])
+def boxplot(exps, base_path, metric, ms_per_plot):
+    rows = int(len(exps[0])/ms_per_plot)
+#     print(rows)
+#     print(len(exps))
+    plot, plot_axs = plt.subplots(nrows=rows, ncols=len(exps), figsize=(15, 60), dpi=300)
+    for i in range(rows):
+        for j in range(len(exps)):
+#             print('{}-{}'.format(i, j))
+            dfs = []
+            for k in range(ms_per_plot):
+                c = exps[j][i * ms_per_plot + k]
+                name = '{}-{}-{}-{}-{}'.format(
+                    c[FILE],
+                    c[TRANSPORT],
+                    c[BANDWIDTH],
+                    c[CONGESTION_CONTROL],
+                    c[FEEDBACK_FREQUENCY]
+                )
+                file = Path(base_path + name + '/' + metric + '.log')
+                col_name = c[FEEDBACK_FREQUENCY] if c[FEEDBACK_FREQUENCY] != '0s' else 'none'
+                df = get_df(file, 'box_' + metric, col_names=[col_name])
+                dfs.append(df)
 
-    figures = []
-    if metric == 'ssim':
-        return [
-            plot_ssim([udp_no_cc, datagram_no_cc, streamperframe_no_cc]),
-            plot_ssim([udp_scream_100, datagram_scream_100, streamperframe_scream_100]),
-            plot_ssim([udp_scream_200, datagram_scream_200, streamperframe_scream_200]),
-            plot_ssim([udp_scream_300, datagram_scream_300, streamperframe_scream_300]),
-            plot_ssim([udp_scream_400, datagram_scream_400, streamperframe_scream_400]),
-            plot_ssim([udp_scream_500, datagram_scream_500, streamperframe_scream_500])
-        ]
+            frame = pd.concat(dfs, axis=1)
+            axes = frame.boxplot(rot=90, figsize=(3, 6), ax=plot_axs[i, j])
+            plot_axs[i, j].set_title('{}-{}-{}'.format(c[FILE], c[TRANSPORT], str(c[BANDWIDTH] / 1000000) + 'Mb/s'))
 
-    if metric == 'psnr':
-        return [
-            plot_psnr([udp_no_cc, datagram_no_cc, streamperframe_no_cc]),
-            plot_psnr([udp_scream_100, datagram_scream_100, streamperframe_scream_100]),
-            plot_psnr([udp_scream_200, datagram_scream_200, streamperframe_scream_200]),
-            plot_psnr([udp_scream_300, datagram_scream_300, streamperframe_scream_300]),
-            plot_psnr([udp_scream_400, datagram_scream_400, streamperframe_scream_400]),
-            plot_psnr([udp_scream_500, datagram_scream_500, streamperframe_scream_500])
-        ]
+    plot.tight_layout()
+    return plot
 
-    if metric == 'scream':
-        return [
-            plot_scream([udp_scream_100, datagram_scream_100, streamperframe_scream_100]),
-            plot_scream([udp_scream_200, datagram_scream_200, streamperframe_scream_200]),
-            plot_scream([udp_scream_300, datagram_scream_300, streamperframe_scream_300]),
-            plot_scream([udp_scream_400, datagram_scream_400, streamperframe_scream_400]),
-            plot_scream([udp_scream_500, datagram_scream_500, streamperframe_scream_500])
-        ]
-
-def psnr():
-    figures = get_figures('psnr')
-    with PdfPages('psnr.pdf') as pdf:
-        for figure in figures:
-            pdf.savefig(figure)
-
-def ssim():
-    figures = get_figures('ssim')
-    with PdfPages('ssim.pdf') as pdf:
-        for figure in figures:
-            pdf.savefig(figure)
-
-def scream():
-    figures = get_figures('scream')
-    with PdfPages('scream.pdf') as pdf:
-        for figure in figures:
-            pdf.savefig(figure)
 
 def main():
-    psnr()
-    ssim()
-    scream()
+    parser = argparse.ArgumentParser('Plot cgo-streamer benchmarks')
+    parser.add_argument('path')
+    args = parser.parse_args()
+    BASE_PATH = args.path
+
+    combinations = get_log_paths(Path(BASE_PATH), 'ssim')
+
+    files = list(set([combi['params'][FILE] for combi in combinations]))
+    transports = list(set([combi['params'][TRANSPORT] for combi in combinations]))
+    bandwidths = sorted(list(set([int(combi['params'][BANDWIDTH]) for combi in combinations])))
+    congestion_controls = sorted(list(set([combi['params'][CONGESTION_CONTROL] for combi in combinations])))
+    feedback_frequencies = sorted(list(set([combi['params'][FEEDBACK_FREQUENCY] for combi in combinations])))
+
+    product = sorted(list(itertools.product(*[
+        files,
+        transports,
+        bandwidths,
+        congestion_controls,
+        feedback_frequencies
+    ])), key=lambda k: (k[0], k[1], k[2], k[3], int(re.split('ms|s', k[4])[0])))
+
+
+    product = [f for f in product if os.path.isdir(
+        BASE_PATH + '{}-{}-{}-{}-{}'.format(f[FILE], f[TRANSPORT], f[BANDWIDTH], f[CONGESTION_CONTROL], f[FEEDBACK_FREQUENCY])
+        )]
+
+    udp = [c for c in product if c[TRANSPORT] == 'udp']
+    datagram = [c for c in product if c[TRANSPORT] == 'datagram']
+    streamperframe = [c for c in product if c[TRANSPORT] == 'streamperframe']
+
+    for f in files:
+        for m in ['ssim', 'psnr']:
+            with PdfPages(f + '-' + m + '.pdf') as pdf:
+                for b in bandwidths:
+                    udp_b = [u for u in udp if u[BANDWIDTH] == b and u[FILE] == f]
+                    datagram_b = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f]
+                    streamperframe_b = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f]
+                    plot, cdf = plot_metric([udp_b, datagram_b, streamperframe_b], BASE_PATH, m)
+                    pdf.savefig(plot)
+                    pdf.savefig(cdf)
+                    plt.close(plot)
+                    plt.close(cdf)
+
+            with PdfPages(f + '-' + m + '-box.pdf') as pdf:
+                fig = boxplot([udp, datagram, streamperframe], BASE_PATH, m, len(feedback_frequencies))
+                pdf.savefig(fig)
+                plt.close(fig)
 
 if __name__ == "__main__":
     main()

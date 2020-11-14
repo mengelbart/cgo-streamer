@@ -69,11 +69,11 @@ var handlers = []string{
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
+	1 * time.Millisecond,
+	5 * time.Millisecond,
 	10 * time.Millisecond,
-	25 * time.Millisecond,
-	50 * time.Millisecond,
 	100 * time.Millisecond,
-	200 * time.Millisecond,
+	500 * time.Millisecond,
 }
 
 // generate all combination of configurations
@@ -325,7 +325,7 @@ func benchmark() {
 				if err := stream.Process.Kill(); err != nil {
 					fmt.Printf("could not kill process: %v\n", err)
 				}
-				fmt.Printf("stream client process killed after timeout")
+				fmt.Printf("stream client process killed after timeout:\n%v\n", c.clientCmd())
 			case err := <-done:
 				if err != nil {
 					fmt.Printf("stream client process finished with error: %v\n", err)

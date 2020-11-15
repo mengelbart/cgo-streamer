@@ -4,3 +4,8 @@ input/
 data/
 sintel/
 .idea/
+*.pdf
+.ipynb_checkpoints/
+*.ipynb
+*.log
+testvideos/

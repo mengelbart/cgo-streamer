@@ -98,14 +98,13 @@ func cartesianConfigs(
 
 		if c.CongestionControl != "none" {
 			for _, ff := range ffs {
-				cf := &config{
+				configs = append(configs, &config{
 					Filename:          c.Filename,
 					Bandwidth:         c.Bandwidth,
 					CongestionControl: c.CongestionControl,
 					Handler:           c.Handler,
 					FeedbackFrequency: ff,
-				}
-				configs = append(configs, cf)
+				})
 			}
 		} else {
 			configs = append(configs, c)
@@ -167,7 +166,6 @@ func (c config) clientCmd() []string {
 
 	if c.CongestionControl == "scream" {
 		cmd = append(cmd, "-s")
-		cmd = append(cmd, "--feedback-frequency", fmt.Sprintf("%v", int64(c.FeedbackFrequency)))
 	}
 	return cmd
 }

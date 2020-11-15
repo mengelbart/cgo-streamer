@@ -155,20 +155,22 @@ func (s *ScreamSendWriter) Run() {
 }
 
 type ScreamReadWriter struct {
-	w                 io.Writer
-	screamRx          *scream.Rx
-	packetChan        chan *rtp.Packet
-	CloseChan         chan struct{}
-	feedbackFrequency time.Duration
+	w                     io.Writer
+	screamRx              *scream.Rx
+	packetChan            chan *rtp.Packet
+	CloseChan             chan struct{}
+	feedbackFrequency     time.Duration
+	sendImmediateFeedback bool
 }
 
-func NewScreamReadWriter(w io.Writer, feedbackFrequency time.Duration) *ScreamReadWriter {
+func NewScreamReadWriter(w io.Writer, feedbackFrequency time.Duration, sendImmediateFeedback bool) *ScreamReadWriter {
 	return &ScreamReadWriter{
-		w:                 w,
-		screamRx:          scream.NewRx(1),
-		packetChan:        make(chan *rtp.Packet, 1024),
-		CloseChan:         make(chan struct{}, 1),
-		feedbackFrequency: feedbackFrequency,
+		w:                     w,
+		screamRx:              scream.NewRx(1),
+		packetChan:            make(chan *rtp.Packet, 1024),
+		CloseChan:             make(chan struct{}, 1),
+		feedbackFrequency:     feedbackFrequency,
+		sendImmediateFeedback: sendImmediateFeedback,
 	}
 }
 
@@ -197,6 +199,17 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 				int(p.SequenceNumber),
 				0,
 			)
+			if s.sendImmediateFeedback {
+				if ok, feedback := s.screamRx.CreateStandardizedFeedback(
+					uint(gst.GetTimeInNTP()),
+					true,
+				); ok {
+					_, err := fbw.Write(feedback)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
 		case <-ticker.C:
 			if ok, feedback := s.screamRx.CreateStandardizedFeedback(
 				uint(gst.GetTimeInNTP()),

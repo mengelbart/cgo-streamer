@@ -18,11 +18,13 @@ import (
 
 var VideoSink string
 var FeedbackFreq int
+var SendImmediateFeedback bool
 
 func init() {
 	rootCmd.AddCommand(streamCmd)
 	streamCmd.Flags().StringVar(&VideoSink, "video-sink", "autovideosink", "File to save video")
-	streamCmd.Flags().IntVarP(&FeedbackFreq, "feedback-frequency", "f", 500, "Frequency in which scream feedback is sent in ms (additionally to every incoming packet)")
+	streamCmd.Flags().IntVarP(&FeedbackFreq, "feedback-frequency", "f", 500, "Frequency in which scream feedback is sent in ms")
+	streamCmd.Flags().BoolVarP(&SendImmediateFeedback, "immediate-feedback", "i", false, "Send SCReAM Feedback immediately when a new RTP Packet was received.")
 }
 
 var streamCmd = &cobra.Command{
@@ -53,7 +55,7 @@ func run() error {
 
 	var client FeedbackRunner
 	if Scream {
-		screamWriter := transport.NewScreamReadWriter(pipeline, time.Duration(FeedbackFreq)*time.Millisecond)
+		screamWriter := transport.NewScreamReadWriter(pipeline, time.Duration(FeedbackFreq)*time.Millisecond, SendImmediateFeedback)
 		closeChans = append(closeChans, screamWriter.CloseChan)
 		client = newClient(Handler, Addr, screamWriter, QLOGFile)
 		sender, c, err := client.RunFeedbackSender()

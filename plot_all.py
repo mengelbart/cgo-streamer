@@ -71,7 +71,7 @@ def plot_metric(exps, base_path, metric):
                 c[FEEDBACK_FREQUENCY]
             )
             file = Path(base_path + name + '/'+ metric + '.log')
-            df = pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[11], names=[col_name])
+            df = get_df(file, metric)
             df[np.isfinite(df)][metric].plot(ax=plot_axs[i, j])
             df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
             plot_axs[i, j].set_title('plot: ' + name)

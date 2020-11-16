@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/lucas-clemente/quic-go v0.18.0
-	github.com/mengelbart/scream-go v0.0.0-20201112103702-e3ca855ff2d4
+	github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775
 	github.com/pion/rtcp v1.2.4
 	github.com/pion/rtp v1.6.1
 	github.com/spf13/cobra v1.0.0

@@ -73,12 +73,12 @@ def plot_metric(exps, base_path, metric):
             file = Path(base_path + name + '/'+ metric + '.log')
             df = get_df(file, metric)
             df[np.isfinite(df)][metric].plot(ax=plot_axs[i, j])
-            df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
             axes = plt.gca()
             if metric == 'ssim':
                 axes.set_ylim([-1, 1])
             elif metric == 'psnr':
                 axes.set_ylim([0, 100])
+            df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
             plot_axs[i, j].set_title('plot: ' + name)
             cdf_axs[i, j].set_title('cdf: ' + name)
 

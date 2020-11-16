@@ -64,7 +64,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	for {
 		select {
 		case <-ticker.C:
-			stats := s.screamTx.GetStatistics(uint(gst.GetTimeInNTP()))
+			stats := s.screamTx.GetStatistics(uint(gst.GetTimeInNTP() / 65536.0))
 			statSlice := strings.Split(stats, ",")
 			screamLogger.Printf("%v %v %v %v %v %v %v %v", time.Since(start).Milliseconds(), s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
@@ -93,7 +93,7 @@ func (s *ScreamSendWriter) Run() {
 		case packet := <-s.packet:
 			s.q.Push(&RTPQueueItem{
 				Packet:    packet,
-				Timestamp: gst.GetTimeInNTP() / 65536.0,
+				Timestamp: float64(gst.GetTimeInNTP()) / 65536.0,
 			})
 			s.screamTx.NewMediaFrame(uint(gst.GetTimeInNTP()), s.ssrc, len(packet.Raw))
 

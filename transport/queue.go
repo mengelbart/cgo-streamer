@@ -6,7 +6,7 @@ import (
 
 type RTPQueueItem struct {
 	Packet    *rtp.Packet
-	Timestamp uint32
+	Timestamp float64
 }
 
 type Queue struct {
@@ -70,7 +70,7 @@ func (q *Queue) GetDelay(f float64) float64 {
 	if len(q.q) <= 0 {
 		return 0
 	}
-	d := f - float64(q.q[0].Timestamp)
+	d := f - q.q[0].Timestamp
 	return d
 }
 

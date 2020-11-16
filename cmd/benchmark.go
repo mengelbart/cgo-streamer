@@ -54,9 +54,7 @@ var bandwidths = []bitrate{
 	3 * mBitPerSecond,
 	5 * mBitPerSecond,
 	10 * mBitPerSecond,
-	20 * mBitPerSecond,
 	30 * mBitPerSecond,
-	40 * mBitPerSecond,
 	50 * mBitPerSecond,
 }
 var congestionControllers = []string{
@@ -70,10 +68,8 @@ var handlers = []string{
 }
 var feedbackFrequencies = []time.Duration{
 	1 * time.Millisecond,
-	5 * time.Millisecond,
 	10 * time.Millisecond,
 	100 * time.Millisecond,
-	500 * time.Millisecond,
 }
 
 // generate all combination of configurations

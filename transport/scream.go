@@ -91,7 +91,10 @@ func (s *ScreamSendWriter) Run() {
 	for {
 		select {
 		case packet := <-s.packet:
-			s.q.Push(packet)
+			s.q.Push(&RTPQueueItem{
+				Packet:    packet,
+				Timestamp: gst.GetTimeInNTP() / 65536.0,
+			})
 			s.screamTx.NewMediaFrame(uint(gst.GetTimeInNTP()), s.ssrc, len(packet.Raw))
 
 		case fb := <-s.feedback:
@@ -129,8 +132,8 @@ func (s *ScreamSendWriter) Run() {
 			timer = time.NewTimer(time.Duration(dT))
 			continue
 		}
-		packet := s.q.Pop()
-		bs, err := packet.Marshal()
+		item := s.q.Pop()
+		bs, err := item.Packet.Marshal()
 		if err != nil {
 			log.Println(err)
 		}
@@ -141,10 +144,10 @@ func (s *ScreamSendWriter) Run() {
 		//log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
 		dT = s.screamTx.AddTransmitted(
 			uint(gst.GetTimeInNTP()),
-			uint(packet.SSRC),
-			len(packet.Raw),
-			uint(packet.SequenceNumber),
-			packet.Marker,
+			uint(item.Packet.SSRC),
+			len(item.Packet.Raw),
+			uint(item.Packet.SequenceNumber),
+			item.Packet.Marker,
 		)
 		if dT != -1 {
 			//log.Printf("after transmitted: waiting for %v", dT)

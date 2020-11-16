@@ -19,10 +19,10 @@ void go_gst_init_t0() {
 
 
 uint32_t go_gst_getTimeInNtp(){
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
-  double time = tp.tv_sec + tp.tv_usec*1e-6-t0;
-  uint64_t ntp64 = time*65536.0;
-  uint32_t ntp = 0xFFFFFFFF & ntp64;
-  return ntp;
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    double time = tp.tv_sec + tp.tv_usec*1e-6-t0;
+    uint64_t ntp64 = time*65536.0;
+    uint32_t ntp = 0xFFFFFFFF & ntp64;
+    return ntp;
 }

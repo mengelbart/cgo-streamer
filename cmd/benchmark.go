@@ -50,6 +50,7 @@ const (
 )
 
 var bandwidths = []bitrate{
+	0,
 	1 * mBitPerSecond,
 	3 * mBitPerSecond,
 	5 * mBitPerSecond,
@@ -162,6 +163,7 @@ func (c config) clientCmd() []string {
 
 	if c.CongestionControl == "scream" {
 		cmd = append(cmd, "-s")
+		cmd = append(cmd, "--feedback-frequency", fmt.Sprintf("%v", c.FeedbackFrequency.Milliseconds()))
 	}
 	return cmd
 }
@@ -274,6 +276,10 @@ func benchmark() {
 			serve := exec.Command("ip", append([]string{"netns", "exec", "ns1", bin}, c.serveCmd()...)...)
 			serve.Stdout = serveLogFile
 			serve.Stderr = serveLogFile
+			_, err = fmt.Fprint(serveLogFile, serve.Args)
+			if err != nil {
+				fmt.Printf("could write to server logfile: %v\n", err)
+			}
 			err = serve.Start()
 			if err != nil {
 				fmt.Printf("could not run server: %v\n", err)
@@ -294,6 +300,10 @@ func benchmark() {
 			stream := exec.Command("ip", append([]string{"netns", "exec", "ns2", bin}, c.clientCmd()...)...)
 			stream.Stdout = clientLogFile
 			stream.Stderr = clientLogFile
+			_, err = fmt.Fprint(clientLogFile, stream.Args)
+			if err != nil {
+				fmt.Printf("could write to client stream logfile: %v\n", err)
+			}
 			err = stream.Start()
 			if err != nil {
 				fmt.Printf("could not start stream client: %v\n", err)

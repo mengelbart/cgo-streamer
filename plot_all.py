@@ -74,6 +74,10 @@ def plot_metric(exps, base_path, metric):
             df = get_df(file, metric)
             df[np.isfinite(df)][metric].plot(ax=plot_axs[i, j])
             df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
+            if metric == 'ssim':
+                plot_axs.set_ylim([-1, 1])
+            elif metric == 'psnr':
+                plot_axs.set_ylim([0, 100])
             plot_axs[i, j].set_title('plot: ' + name)
             cdf_axs[i, j].set_title('cdf: ' + name)
 
@@ -83,12 +87,9 @@ def plot_metric(exps, base_path, metric):
 
 def boxplot(exps, base_path, metric, ms_per_plot):
     rows = int(len(exps[0])/ms_per_plot)
-#     print(rows)
-#     print(len(exps))
     plot, plot_axs = plt.subplots(nrows=rows, ncols=len(exps), figsize=(15, 60), dpi=300)
     for i in range(rows):
         for j in range(len(exps)):
-#             print('{}-{}'.format(i, j))
             dfs = []
             for k in range(ms_per_plot):
                 c = exps[j][i * ms_per_plot + k]
@@ -106,6 +107,10 @@ def boxplot(exps, base_path, metric, ms_per_plot):
 
             frame = pd.concat(dfs, axis=1)
             axes = frame.boxplot(rot=90, figsize=(3, 6), ax=plot_axs[i, j])
+            if metric == 'ssim':
+                axes.set_ylim([-1, 1])
+            elif metric == 'psnr':
+                axes.set_ylim([0, 100])
             plot_axs[i, j].set_title('{}-{}-{}'.format(c[FILE], c[TRANSPORT], str(c[BANDWIDTH] / 1000000) + 'Mb/s'))
 
     plot.tight_layout()
@@ -157,7 +162,10 @@ def main():
                     plt.close(cdf)
 
             with PdfPages(f + '-' + m + '-box.pdf') as pdf:
-                fig = boxplot([udp, datagram, streamperframe], BASE_PATH, m, len(feedback_frequencies))
+                udp_f = [u for u in udp if u[FILE] == f]
+                datagram_f = [u for u in datagram if u[FILE] == f]
+                streamperframe_f = [u for u in streamperframe if u[FILE] == f]
+                fig = boxplot([udp_f, datagram_f, streamperframe_f], BASE_PATH, m, len(feedback_frequencies))
                 pdf.savefig(fig)
                 plt.close(fig)
 

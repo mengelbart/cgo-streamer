@@ -196,10 +196,6 @@ func benchmark() {
 	if err != nil {
 		panic(err)
 	}
-	plotter, err := filepath.Abs("plot.py")
-	if err != nil {
-		panic(err)
-	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -349,20 +345,6 @@ func benchmark() {
 			err = ffmpeg.Run()
 			if err != nil {
 				fmt.Printf("could not run ffmpeg: %v\n", err)
-			}
-
-			plotterLog := "plotter.log"
-			plotterLogFile, err := os.Create(plotterLog)
-			if err != nil {
-				fmt.Printf("could not touch plotter log: %v", err)
-				return
-			}
-			pyplot := exec.Command(plotter)
-			pyplot.Stdout = plotterLogFile
-			pyplot.Stderr = plotterLogFile
-			err = pyplot.Run()
-			if err != nil {
-				fmt.Printf("could not run plotter: %v\n", err)
 			}
 		}()
 	}

@@ -41,7 +41,7 @@ const (
 	addr    = "192.168.1.11:4242"
 )
 
-type bitrate int64
+type bitrate uint64
 
 const (
 	bitPerSecond  bitrate = 1
@@ -55,7 +55,6 @@ var bandwidths = []bitrate{
 	3 * mBitPerSecond,
 	5 * mBitPerSecond,
 	10 * mBitPerSecond,
-	30 * mBitPerSecond,
 	50 * mBitPerSecond,
 }
 var congestionControllers = []string{
@@ -70,6 +69,10 @@ var handlers = []string{
 var feedbackFrequencies = []time.Duration{
 	1 * time.Millisecond,
 	10 * time.Millisecond,
+	20 * time.Millisecond,
+	40 * time.Millisecond,
+	60 * time.Millisecond,
+	80 * time.Millisecond,
 	100 * time.Millisecond,
 }
 

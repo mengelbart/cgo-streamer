@@ -88,6 +88,15 @@ void go_gst_destroy_src_pipeline(GstElement* pipeline) {
     gst_object_unref(pipeline);
 }
 
+void go_gst_force_key_frame(GstElement* pipeline) {
+    GstStructure *s;
+    GstEvent *force_key_unit_event;
+
+    s = gst_structure_new ("GstForceKeyUnit", "all-headers", G_TYPE_BOOLEAN, TRUE, NULL);
+    force_key_unit_event = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM, s);
+    gst_element_send_event(pipeline, force_key_unit_event);
+}
+
 unsigned int go_gst_get_ssrc(GstElement* pipeline) {
     GstElement* rtph264pay = gst_bin_get_by_name(GST_BIN(pipeline), "rtph264pay");
     unsigned int ssrc = 0;

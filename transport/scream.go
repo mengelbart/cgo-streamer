@@ -21,6 +21,7 @@ type ScreamSendWriter struct {
 	feedback        <-chan []byte
 	done            chan struct{}
 	screamLogWriter io.Writer
+	requestKeyFrame func()
 }
 
 func (s *ScreamSendWriter) Close() error {
@@ -43,6 +44,10 @@ func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte,
 		feedback:        fb,
 		screamLogWriter: screamLogWriter,
 	}
+}
+
+func (s *ScreamSendWriter) SetKeyFrameRequester(requestKeyFrame func()) {
+	s.requestKeyFrame = requestKeyFrame
 }
 
 func (s *ScreamSendWriter) Write(b []byte) (int, error) {
@@ -70,6 +75,10 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
 			if kbps <= 0 {
 				log.Printf("skipping setBitrate to %v\n", kbps)
+				if s.requestKeyFrame != nil {
+					log.Printf("requesting new key frame")
+					s.requestKeyFrame()
+				}
 				continue
 			}
 			if lastBitrate != uint(kbps) {

@@ -132,6 +132,7 @@ func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
+	cc.SetKeyFrameRequester(p.ForceKeyFrame)
 	p.Start()
 	go cc.Run()
 	go cc.RunBitrate(p.SetBitRate)

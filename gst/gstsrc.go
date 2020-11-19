@@ -50,6 +50,10 @@ func (p *SrcPipeline) Stop() {
 	C.go_gst_stop_src_pipeline(p.pipeline)
 }
 
+func (p *SrcPipeline) ForceKeyFrame() {
+	C.go_gst_force_key_frame(p.pipeline)
+}
+
 func (p *SrcPipeline) Destroy() {
 	C.go_gst_destroy_src_pipeline(p.pipeline)
 }

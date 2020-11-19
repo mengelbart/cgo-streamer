@@ -37,11 +37,21 @@ def get_df(file, metric, col_names=[]):
     elif metric == 'box_psnr':
         return pd.read_csv(file, sep=r'[\s:]', engine='python', usecols=[11], names=col_names)
 
-def plot_scream(exps):
+
+def plot_scream(exps, base_path):
     fig, axs = plt.subplots(3 * len(exps[0]), len(exps), sharex=True, sharey='row', figsize=(30, 30), dpi=300)
     for j in range(len(exps)):
             for i in range(len(exps[0])):
-                file=exps[j][i]['path']
+                c = exps[j][i]
+                print(c)
+                name = '{}-{}-{}-{}-{}'.format(
+                    c[FILE],
+                    c[TRANSPORT],
+                    c[BANDWIDTH],
+                    c[CONGESTION_CONTROL],
+                    c[FEEDBACK_FREQUENCY]
+                )
+                file = Path(base_path + name + '/scream.log')
                 df=pd.read_csv(file, sep="\s+|\t+|\s+\t+|\t+\s+", engine='python',
                     names=['time', 'queueLen', 'cwnd', 'bytesInFlight', 'fastStart', 'queueDelay', 'targetBitrate', 'rateTransmitted'])
 
@@ -49,10 +59,15 @@ def plot_scream(exps):
                 df.sort_values('time').plot(x='time', y=['targetBitrate', 'rateTransmitted'], ax=axs[i * 3 + 1, j])
                 df.sort_values('time').plot(x='time', y=['queueLen'], ax=axs[i * 3 + 2, j])
 
-                axs[i * 3, j].set_title(file.parts[-2].split('mkv-')[-1])
+                axs[i * 3, j].set_title('plot: {}-{}-{}-{}-{}'.format(
+                    c[FILE],
+                    c[TRANSPORT],
+                    str(c[BANDWIDTH] / 1000000) + 'Mb/s',
+                    c[CONGESTION_CONTROL],
+                    c[FEEDBACK_FREQUENCY]
+                ))
 
-    plot.tight_layout()
-    cdf.tight_layout()
+    fig.tight_layout()
     return fig
 
 def plot_metric(exps, base_path, metric):
@@ -73,14 +88,25 @@ def plot_metric(exps, base_path, metric):
             file = Path(base_path + name + '/'+ metric + '.log')
             df = get_df(file, metric)
             df[np.isfinite(df)][metric].plot(ax=plot_axs[i, j])
-            axes = plt.gca()
             if metric == 'ssim':
-                axes.set_ylim([-1, 1])
+                plot_axs[i, j].set_ylim([-1, 1])
             elif metric == 'psnr':
-                axes.set_ylim([0, 100])
+                plot_axs[i, j].set_ylim([0, 100])
             df[np.isfinite(df)][metric].hist(cumulative=True, bins=len(df[metric]), density=True, ax=cdf_axs[i, j])
-            plot_axs[i, j].set_title('plot: ' + name)
-            cdf_axs[i, j].set_title('cdf: ' + name)
+            plot_axs[i, j].set_title('plot: {}-{}-{}-{}-{}'.format(
+                c[FILE],
+                c[TRANSPORT],
+                str(c[BANDWIDTH] / 1000000) + 'Mb/s',
+                c[CONGESTION_CONTROL],
+                c[FEEDBACK_FREQUENCY]
+            ))
+            cdf_axs[i, j].set_title('cdf: {}-{}-{}-{}-{}'.format(
+                c[FILE],
+                c[TRANSPORT],
+                str(c[BANDWIDTH] / 1000000) + 'Mb/s',
+                c[CONGESTION_CONTROL],
+                c[FEEDBACK_FREQUENCY]
+            ))
 
     plot.tight_layout()
     cdf.tight_layout()
@@ -109,9 +135,9 @@ def boxplot(exps, base_path, metric, ms_per_plot):
             frame = pd.concat(dfs, axis=1)
             axes = frame.boxplot(rot=90, figsize=(3, 6), ax=plot_axs[i, j])
             if metric == 'ssim':
-                axes.set_ylim([-1, 1])
+                axes.set_ylim([-1, 2])
             elif metric == 'psnr':
-                axes.set_ylim([0, 100])
+                axes.set_ylim([0, 200])
             plot_axs[i, j].set_title('{}-{}-{}'.format(c[FILE], c[TRANSPORT], str(c[BANDWIDTH] / 1000000) + 'Mb/s'))
 
     plot.tight_layout()
@@ -167,6 +193,18 @@ def main():
                 datagram_f = [u for u in datagram if u[FILE] == f]
                 streamperframe_f = [u for u in streamperframe if u[FILE] == f]
                 fig = boxplot([udp_f, datagram_f, streamperframe_f], BASE_PATH, m, len(feedback_frequencies))
+                pdf.savefig(fig)
+                plt.close(fig)
+
+        with PdfPages(f + '-scream.pdf') as pdf:
+            for b in bandwidths:
+                udp_s = [u for u in udp if u[BANDWIDTH] == b and u[FILE] ==
+                        f and u[CONGESTION_CONTROL] == 'scream']
+                datagram_s = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f and
+                        f and u[CONGESTION_CONTROL] == 'scream']
+                streamperframe_s = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f and
+                        f and u[CONGESTION_CONTROL] == 'scream']
+                fig = plot_scream([udp_s, datagram_s, streamperframe_s], BASE_PATH)
                 pdf.savefig(fig)
                 plt.close(fig)
 

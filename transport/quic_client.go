@@ -84,7 +84,8 @@ func (c *QUICClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 					return err
 				}
 			}
-			err := binary.Write(fbStream, binary.BigEndian, uint32(len(fb)))
+			length := uint32(len(fb))
+			err := binary.Write(fbStream, binary.BigEndian, length)
 			if err != nil {
 				return err
 			}

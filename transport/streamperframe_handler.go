@@ -90,20 +90,13 @@ func (m *StreamPerFrameSession) AcceptFeedback() error {
 			continue
 		}
 		fb := make([]byte, size)
-		var read uint32
-		for read < size {
-			var n int
-			tmp := make([]byte, size-read)
-			n, err = fbStream.Read(tmp)
-			read += uint32(n)
-			fb = append(fb, tmp...)
-		}
+		n, err := io.ReadFull(fbStream, fb)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		if read != size {
-			log.Printf("got announcement of size %v feedback, but read %v bytes", size, read)
+		if n != int(size) {
+			log.Printf("got announcement of size %v feedback, but read %v bytes", size, n)
 		}
 		m.feedback <- fb
 	}

@@ -266,6 +266,30 @@ func benchmark() {
 							fmt.Printf("tc delete for ns%v returned error: %v\n", i, err)
 						}
 					}(i)
+
+					time.AfterFunc(15*time.Second, func(i int) func() {
+						return func() {
+							tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "change", "dev", fmt.Sprintf("veth%v", i), "root", "netem", "rate", fmt.Sprintf("%v", c.Bandwidth/2))
+							tc.Stdout = os.Stdout
+							tc.Stderr = os.Stderr
+							err = tc.Run()
+							if err != nil {
+								fmt.Printf("tc add for ns%v returned error: %v\n", i, err)
+							}
+						}
+					}(i))
+
+					time.AfterFunc(30*time.Second, func(i int) func() {
+						return func() {
+							tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "change", "dev", fmt.Sprintf("veth%v", i), "root", "netem", "rate", fmt.Sprintf("%v", c.Bandwidth))
+							tc.Stdout = os.Stdout
+							tc.Stderr = os.Stderr
+							err = tc.Run()
+							if err != nil {
+								fmt.Printf("tc add for ns%v returned error: %v\n", i, err)
+							}
+						}
+					}(i))
 				}
 			}
 

@@ -12,6 +12,7 @@ import re
 import itertools
 import matplotlib as mpl
 import os
+import json
 mpl.rcParams['figure.dpi'] = 100
 
 FILE = 0
@@ -71,7 +72,6 @@ def plot_scream(exps, base_path):
     return fig
 
 def plot_metric(exps, base_path, metric):
-
     plot, plot_axs = plt.subplots(len(exps[0]), len(exps), sharex=True, sharey=True, figsize=(30, 30), dpi=300)
     cdf, cdf_axs = plt.subplots(len(exps[0]), len(exps), sharex=True, sharey=True, figsize=(30, 30), dpi=300)
     for j in range(len(exps)):
@@ -143,6 +143,43 @@ def boxplot(exps, base_path, metric, ms_per_plot):
     plot.tight_layout()
     return plot
 
+def plot_smoothed_rtt(exps, base_path):
+    fig, axs = plt.subplots(len(exps[0]), len(exps), sharex=True, sharey='row', figsize=(30, 30), dpi=300)
+    for j in range(len(exps)):
+        for i in range(len(exps[0])):
+            c = exps[j][i]
+            print(c)
+            name = '{}-{}-{}-{}-{}'.format(
+                c[FILE],
+                c[TRANSPORT],
+                c[BANDWIDTH],
+                c[CONGESTION_CONTROL],
+                c[FEEDBACK_FREQUENCY]
+            )
+            file = Path(base_path + name + '/server.qlog')
+
+            with open(file) as fi:
+                f = fi.read()
+
+            d = json.loads(f)['traces'][0]['events']
+            smoothed_rtt = [
+                {
+                    'time': rtt[0],
+                    'smoothed_rtt': rtt[3]['smoothed_rtt']
+                } for rtt in d if rtt[2] == 'metrics_updated' and 'smoothed_rtt' in rtt[3].keys()]
+            df = pd.DataFrame(smoothed_rtt)
+            df.plot(x='time', y=['smoothed_rtt'], ax=axs[i, j])
+
+            axs[i, j].set_title('plot: {}-{}-{}-{}-{}'.format(
+                c[FILE],
+                c[TRANSPORT],
+                str(c[BANDWIDTH] / 1000000) + 'Mb/s',
+                c[CONGESTION_CONTROL],
+                c[FEEDBACK_FREQUENCY]
+            ))
+
+    fig.tight_layout()
+    return fig
 
 def main():
     parser = argparse.ArgumentParser('Plot cgo-streamer benchmarks')
@@ -176,35 +213,43 @@ def main():
     streamperframe = [c for c in product if c[TRANSPORT] == 'streamperframe']
 
     for f in files:
-        for m in ['ssim', 'psnr']:
-            with PdfPages(f + '-' + m + '.pdf') as pdf:
-                for b in bandwidths:
-                    udp_b = [u for u in udp if u[BANDWIDTH] == b and u[FILE] == f]
-                    datagram_b = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f]
-                    streamperframe_b = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f]
-                    plot, cdf = plot_metric([udp_b, datagram_b, streamperframe_b], BASE_PATH, m)
-                    pdf.savefig(plot)
-                    pdf.savefig(cdf)
-                    plt.close(plot)
-                    plt.close(cdf)
+       for m in ['ssim', 'psnr']:
+           with PdfPages(f + '-' + m + '.pdf') as pdf:
+               for b in bandwidths:
+                   udp_b = [u for u in udp if u[BANDWIDTH] == b and u[FILE] == f]
+                   datagram_b = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f]
+                   streamperframe_b = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f]
+                   plot, cdf = plot_metric([udp_b, datagram_b, streamperframe_b], BASE_PATH, m)
+                   pdf.savefig(plot)
+                   pdf.savefig(cdf)
+                   plt.close(plot)
+                   plt.close(cdf)
 
-            with PdfPages(f + '-' + m + '-box.pdf') as pdf:
-                udp_f = [u for u in udp if u[FILE] == f]
-                datagram_f = [u for u in datagram if u[FILE] == f]
-                streamperframe_f = [u for u in streamperframe if u[FILE] == f]
-                fig = boxplot([udp_f, datagram_f, streamperframe_f], BASE_PATH, m, len(feedback_frequencies))
-                pdf.savefig(fig)
-                plt.close(fig)
+           with PdfPages(f + '-' + m + '-box.pdf') as pdf:
+               udp_f = [u for u in udp if u[FILE] == f]
+               datagram_f = [u for u in datagram if u[FILE] == f]
+               streamperframe_f = [u for u in streamperframe if u[FILE] == f]
+               fig = boxplot([udp_f, datagram_f, streamperframe_f], BASE_PATH, m, len(feedback_frequencies))
+               pdf.savefig(fig)
+               plt.close(fig)
 
-        with PdfPages(f + '-scream.pdf') as pdf:
+       with PdfPages(f + '-scream.pdf') as pdf:
+           for b in bandwidths:
+               udp_s = [u for u in udp if u[BANDWIDTH] == b and u[FILE] ==
+                       f and u[CONGESTION_CONTROL] == 'scream']
+               datagram_s = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f and
+                       f and u[CONGESTION_CONTROL] == 'scream']
+               streamperframe_s = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f and
+                       f and u[CONGESTION_CONTROL] == 'scream']
+               fig = plot_scream([udp_s, datagram_s, streamperframe_s], BASE_PATH)
+               pdf.savefig(fig)
+               plt.close(fig)
+
+        with PdfPages(f + '-smoothed_rtt.pdf') as pdf:
             for b in bandwidths:
-                udp_s = [u for u in udp if u[BANDWIDTH] == b and u[FILE] ==
-                        f and u[CONGESTION_CONTROL] == 'scream']
-                datagram_s = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f and
-                        f and u[CONGESTION_CONTROL] == 'scream']
-                streamperframe_s = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f and
-                        f and u[CONGESTION_CONTROL] == 'scream']
-                fig = plot_scream([udp_s, datagram_s, streamperframe_s], BASE_PATH)
+                datagram_s = [u for u in datagram if u[BANDWIDTH] == b and u[FILE] == f]
+                streamperframe_s = [u for u in streamperframe if u[BANDWIDTH] == b and u[FILE] == f]
+                fig = plot_smoothed_rtt([datagram_s, streamperframe_s], BASE_PATH)
                 pdf.savefig(fig)
                 plt.close(fig)
 

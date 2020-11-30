@@ -32,7 +32,7 @@ func init() {
 var benchmarkCmd = &cobra.Command{
 	Use: "bench",
 	Run: func(cmd *cobra.Command, args []string) {
-		benchmark()
+		runBenchmark()
 	},
 }
 
@@ -190,7 +190,7 @@ func initConfigs(raw []*config) []*config {
 	return raw
 }
 
-func benchmark() {
+func runBenchmark() {
 	version, err := version()
 	if err != nil {
 		panic(err)

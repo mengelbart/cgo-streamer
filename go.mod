@@ -3,6 +3,7 @@ module github.com/mengelbart/cgo-streamer
 go 1.15
 
 require (
+	cloud.google.com/go v0.37.0
 	github.com/lucas-clemente/quic-go v0.18.0
 	github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775
 	github.com/pion/rtcp v1.2.4

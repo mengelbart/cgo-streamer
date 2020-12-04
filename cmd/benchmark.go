@@ -60,8 +60,7 @@ var handlers = []string{
 var feedbackFrequencies = []time.Duration{
 	1 * time.Millisecond,
 	10 * time.Millisecond,
-	30 * time.Millisecond,
-	60 * time.Millisecond,
+	40 * time.Millisecond,
 	100 * time.Millisecond,
 }
 
@@ -74,6 +73,7 @@ func runBenchmark() error {
 		Handlers:              handlers,
 		FeedbackFrequencies:   feedbackFrequencies,
 		RequestKeyFrames:      []bool{false, true},
+		Iperf:                 []bool{false, true},
 	}
 	return evaluator.RunAll(
 		dataDir,
@@ -81,13 +81,15 @@ func runBenchmark() error {
 		Commit,
 		Timestamp,
 		addr,
+		port,
 		Upload,
 	)
 }
 
 const (
 	dataDir = "data"
-	addr    = "192.168.1.11:4242"
+	addr    = "192.168.1.11"
+	port    = "4242"
 )
 
 func version() (string, error) {

@@ -31,6 +31,7 @@ type experiment struct {
 	Handler           string        `json:"handler"`
 	FeedbackFrequency time.Duration `json:"feedback_frequency"`
 	RequestKeyFrames  bool          `json:"request_key_frames"`
+	Iperf             bool          `json:"iperf"`
 
 	ServeCMD  string `json:"server_cmd"`
 	StreamCMD string `json:"client_cmd"`
@@ -44,6 +45,7 @@ type experiment struct {
 	ExperimentTimestamp string `json:"experiment_timestamp"`
 
 	addr string
+	port string
 
 	u *uploader
 }
@@ -60,6 +62,9 @@ func (e experiment) String() string {
 	if e.RequestKeyFrames {
 		name = fmt.Sprintf("%v-k", name)
 	}
+	if e.Iperf {
+		name = fmt.Sprintf("%v-i", name)
+	}
 	return name
 }
 
@@ -68,7 +73,7 @@ func (e experiment) serveCmd() []string {
 		"serve",
 		"-v",
 		"-a",
-		e.addr,
+		fmt.Sprintf("%v:%v", e.addr, e.port),
 		"--qlog",
 		"server.qlog",
 		"--video-src",
@@ -91,7 +96,7 @@ func (e experiment) clientCmd() []string {
 		"stream",
 		"-v",
 		"-a",
-		e.addr,
+		fmt.Sprintf("%v:%v", e.addr, e.port),
 		"--qlog",
 		"client.qlog",
 		"--video-sink",
@@ -229,6 +234,53 @@ func (e *experiment) Run() error {
 		return err
 	}
 
+	if e.Iperf {
+		cancel := time.AfterFunc(15*time.Second, func() {
+			iperf3Client := exec.Command(
+				"ip",
+				"netns",
+				"exec",
+				"ns2",
+				"iperf3",
+				"-c",
+				e.addr,
+				"-b",
+				fmt.Sprintf("%v", e.Bandwidth/2),
+				"--logfile",
+				"iperf3client.log",
+				"-J",
+				"-t",
+				"15",
+			)
+			iperf3Client.Stdout = os.Stdout
+			iperf3Client.Stderr = os.Stderr
+			err2 := iperf3Client.Run()
+			if err2 != nil {
+				log.Printf("failed to run iperf3 client: %v", err2)
+			}
+		})
+		iperf3Server := exec.Command(
+			"ip",
+			"netns",
+			"exec",
+			"ns1",
+			"iperf3",
+			"-s",
+			"-B",
+			e.addr,
+			"--logfile",
+			"iperf3server.log",
+			"-J",
+		)
+		iperf3Server.Stdout = os.Stdout
+		iperf3Server.Stderr = os.Stderr
+		err = iperf3Server.Start()
+		if err != nil {
+			log.Printf("failed to run iperf3 server: %v", err)
+			cancel.Stop()
+		}
+	}
+
 	done := make(chan error, 1)
 	go func() {
 		done <- e.stream.Wait()
@@ -285,6 +337,7 @@ type Evaluator struct {
 	Handlers              []string
 	FeedbackFrequencies   []time.Duration
 	RequestKeyFrames      []bool
+	Iperf                 []bool
 }
 
 func (e *Evaluator) buildExperiments() []*experiment {
@@ -293,6 +346,7 @@ func (e *Evaluator) buildExperiments() []*experiment {
 		len(e.Bandwidths),
 		len(e.CongestionControllers),
 		len(e.Handlers),
+		len(e.Iperf),
 	}
 	gen := combin.NewCartesianGenerator(lens)
 	var experiments []*experiment
@@ -303,6 +357,7 @@ func (e *Evaluator) buildExperiments() []*experiment {
 			Bandwidth:         e.Bandwidths[p[1]],
 			CongestionControl: e.CongestionControllers[p[2]],
 			Handler:           e.Handlers[p[3]],
+			Iperf:             e.Iperf[p[4]],
 		}
 
 		if c.CongestionControl != "none" {
@@ -339,7 +394,7 @@ func initFilePaths(raw []*experiment) []*experiment {
 	return raw
 }
 
-func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr string, upload bool) error {
+func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port string, upload bool) error {
 	experiments := e.buildExperiments()
 
 	binary, err := os.Executable()
@@ -381,6 +436,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr string, upl
 		e.Commit = commit
 		e.CommitTimestamp = timestamp
 		e.addr = addr
+		e.port = port
 		e.u = u
 		err := e.setup(binary)
 		if err != nil {

@@ -60,10 +60,8 @@ var handlers = []string{
 var feedbackFrequencies = []time.Duration{
 	1 * time.Millisecond,
 	10 * time.Millisecond,
-	20 * time.Millisecond,
-	40 * time.Millisecond,
+	30 * time.Millisecond,
 	60 * time.Millisecond,
-	80 * time.Millisecond,
 	100 * time.Millisecond,
 }
 
@@ -75,6 +73,7 @@ func runBenchmark() error {
 		CongestionControllers: congestionControllers,
 		Handlers:              handlers,
 		FeedbackFrequencies:   feedbackFrequencies,
+		RequestKeyFrames:      []bool{false, true},
 	}
 	return evaluator.RunAll(
 		dataDir,

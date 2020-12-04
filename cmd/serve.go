@@ -19,12 +19,14 @@ var tracer quictrace.Tracer
 var VideoSrc string
 var Bitrate int
 var ScreamLogFile string
+var RequestKeyFrames bool
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
 	serveCmd.Flags().IntVarP(&Bitrate, "bitrate", "b", 2048, "initial encoder bitrate")
 	serveCmd.Flags().StringVar(&ScreamLogFile, "scream-logger", "stdout", "Log file for scream statistics, 'stdout' prints to stdout, otherwise creates a new file")
+	serveCmd.Flags().BoolVarP(&RequestKeyFrames, "request-key-frames", "k", false, "Request extra key frames when using SCReAM")
 }
 
 var serveCmd = &cobra.Command{
@@ -43,9 +45,10 @@ func serve() error {
 		log.SetOutput(ioutil.Discard)
 	}
 	src := &Src{
-		videoSrc: VideoSrc,
-		scream:   Scream,
-		bitrate:  Bitrate,
+		videoSrc:         VideoSrc,
+		requestKeyFrames: RequestKeyFrames,
+		scream:           Scream,
+		bitrate:          Bitrate,
 	}
 	if Scream {
 		if ScreamLogFile != "stdout" {
@@ -95,10 +98,11 @@ func serve() error {
 }
 
 type Src struct {
-	scream          bool
-	ScreamLogWriter io.Writer
-	videoSrc        string
-	bitrate         int
+	scream           bool
+	requestKeyFrames bool
+	ScreamLogWriter  io.Writer
+	videoSrc         string
+	bitrate          int
 }
 
 func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
@@ -132,7 +136,9 @@ func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
-	cc.SetKeyFrameRequester(p.ForceKeyFrame)
+	if s.requestKeyFrames {
+		cc.SetKeyFrameRequester(p.ForceKeyFrame)
+	}
 	p.Start()
 	go cc.Run()
 	go cc.RunBitrate(p.SetBitRate)

@@ -30,6 +30,7 @@ type experiment struct {
 	CongestionControl string        `json:"congestion_control"`
 	Handler           string        `json:"handler"`
 	FeedbackFrequency time.Duration `json:"feedback_frequency"`
+	RequestKeyFrames  bool          `json:"request_key_frames"`
 
 	ServeCMD  string `json:"server_cmd"`
 	StreamCMD string `json:"client_cmd"`
@@ -48,7 +49,7 @@ type experiment struct {
 }
 
 func (e experiment) String() string {
-	return fmt.Sprintf(
+	name := fmt.Sprintf(
 		"%v-%v-%v-%v-%v",
 		e.BaseFile,
 		e.Handler,
@@ -56,6 +57,10 @@ func (e experiment) String() string {
 		e.CongestionControl,
 		e.FeedbackFrequency,
 	)
+	if e.RequestKeyFrames {
+		name = fmt.Sprintf("%v-k", name)
+	}
+	return name
 }
 
 func (e experiment) serveCmd() []string {
@@ -73,8 +78,10 @@ func (e experiment) serveCmd() []string {
 	}
 
 	if e.CongestionControl == "scream" {
-		cmd = append(cmd, "-s")
-		cmd = append(cmd, "--scream-logger", "scream.log")
+		cmd = append(cmd, "-s", "--scream-logger", "scream.log")
+	}
+	if e.RequestKeyFrames {
+		cmd = append(cmd, "-k")
 	}
 	return cmd
 }
@@ -94,8 +101,7 @@ func (e experiment) clientCmd() []string {
 	}
 
 	if e.CongestionControl == "scream" {
-		cmd = append(cmd, "-s")
-		cmd = append(cmd, "--feedback-frequency", fmt.Sprintf("%v", e.FeedbackFrequency.Milliseconds()))
+		cmd = append(cmd, "-s", "--feedback-frequency", fmt.Sprintf("%v", e.FeedbackFrequency.Milliseconds()))
 	}
 	return cmd
 }
@@ -278,6 +284,7 @@ type Evaluator struct {
 	CongestionControllers []string
 	Handlers              []string
 	FeedbackFrequencies   []time.Duration
+	RequestKeyFrames      []bool
 }
 
 func (e *Evaluator) buildExperiments() []*experiment {
@@ -299,13 +306,17 @@ func (e *Evaluator) buildExperiments() []*experiment {
 		}
 
 		if c.CongestionControl != "none" {
-			for _, ff := range e.FeedbackFrequencies {
+			ccLens := []int{len(e.FeedbackFrequencies), len(e.RequestKeyFrames)}
+			ccGen := combin.NewCartesianGenerator(ccLens)
+			for ccGen.Next() {
+				ccp := ccGen.Product(nil)
 				experiments = append(experiments, &experiment{
 					Filename:          c.Filename,
 					Bandwidth:         c.Bandwidth,
 					CongestionControl: c.CongestionControl,
 					Handler:           c.Handler,
-					FeedbackFrequency: ff,
+					FeedbackFrequency: e.FeedbackFrequencies[ccp[0]],
+					RequestKeyFrames:  e.RequestKeyFrames[ccp[1]],
 				})
 			}
 		} else {

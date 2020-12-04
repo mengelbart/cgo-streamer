@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
 )
@@ -75,7 +77,7 @@ func (u *uploader) Close() error {
 
 func (u *uploader) Upload(path string) error {
 	log.Printf("uploading experiment: %v\n", path)
-	c, err := parseConfig(filepath.Join(path, "config.json"))
+	e, err := parseConfig(filepath.Join(path, "config.json"))
 	if err != nil {
 		return err
 	}
@@ -84,13 +86,17 @@ func (u *uploader) Upload(path string) error {
 		return err
 	}
 	d := &document{
-		File:              c.BaseFile,
-		Bandwidth:         int64(c.Bandwidth),
-		CongestionControl: c.CongestionControl,
-		Handler:           c.Handler,
-		FeedbackFrequency: c.FeedbackFrequency,
-		Version:           c.Version,
+		File:              e.BaseFile,
+		Bandwidth:         int64(e.Bandwidth),
+		CongestionControl: e.CongestionControl,
+		Handler:           e.Handler,
+		FeedbackFrequency: e.FeedbackFrequency,
+		Version:           e.Version,
 		Data:              make(map[string]string),
+	}
+	expName, err := uuid.NewRandom()
+	if err != nil {
+		return fmt.Errorf("could not create uuid as exp name: %v\n", err)
 	}
 	for _, f := range files {
 		name := f.Name()
@@ -105,7 +111,7 @@ func (u *uploader) Upload(path string) error {
 			continue
 		}
 		for name, dt := range data {
-			link, err := u.store(filepath.Join(path, name), dt)
+			link, err := u.store(filepath.Join(expName.String(), name), dt)
 			if err != nil {
 				log.Printf("failed to upload object %v: %v\n", dataFilePath, err)
 				continue
@@ -141,17 +147,17 @@ func (u *uploader) store(path string, dt *DataTable) (string, error) {
 	return fmt.Sprintf("%v/%v/%v\n", googleAPIBaseURL, obj.BucketName(), obj.ObjectName()), nil
 }
 
-func parseConfig(path string) (*config, error) {
+func parseConfig(path string) (*experiment, error) {
 	jsonFile, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := ioutil.ReadAll(jsonFile)
+	bs, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
 		return nil, err
 	}
-	var c config
-	err = json.Unmarshal(bytes, &c)
+	var c experiment
+	err = json.Unmarshal(bs, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +298,7 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 			{
 				T:     "number",
 				ID:    "col_2",
-				Label: "target bitrate",
+				Label: "target Bitrate",
 			},
 			{
 				T:     "number",
@@ -401,7 +407,7 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 	}
 	return map[string]*DataTable{
 		"scream-congestion":   congestion,
-		"scream-bitrate":      bitrate,
+		"scream-Bitrate":      bitrate,
 		"scream-queue-length": queueLength,
 	}, csvFile.Close()
 }

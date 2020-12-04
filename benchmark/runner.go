@@ -1,17 +1,388 @@
 package benchmark
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
-type config struct {
+	"gonum.org/v1/gonum/stat/combin"
+)
+
+type Bitrate uint64
+
+const (
+	BitPerSecond  Bitrate = 1
+	KBitPerSecond         = 1000 * BitPerSecond
+	MBitPerSecond         = 1000 * KBitPerSecond
+)
+
+type experiment struct {
 	Filename          string        `json:"filename"`
 	AbsFile           string        `json:"absolute_filename"`
 	BaseFile          string        `json:"base_filename"`
-	Bandwidth         bitrate       `json:"bandwidth"`
+	Bandwidth         Bitrate       `json:"bandwidth"`
 	CongestionControl string        `json:"congestion_control"`
 	Handler           string        `json:"handler"`
 	FeedbackFrequency time.Duration `json:"feedback_frequency"`
 
-	Version string `json:"version"`
+	ServeCMD  string `json:"server_cmd"`
+	StreamCMD string `json:"client_cmd"`
+
+	serve  *exec.Cmd
+	stream *exec.Cmd
+
+	Version             string `json:"version"`
+	Commit              string `json:"commit"`
+	CommitTimestamp     string `json:"commit_timestamp"`
+	ExperimentTimestamp string `json:"experiment_timestamp"`
+
+	addr string
+
+	u *uploader
 }
 
-type bitrate uint64
+func (e experiment) String() string {
+	return fmt.Sprintf(
+		"%v-%v-%v-%v-%v",
+		e.BaseFile,
+		e.Handler,
+		e.Bandwidth,
+		e.CongestionControl,
+		e.FeedbackFrequency,
+	)
+}
+
+func (e experiment) serveCmd() []string {
+	cmd := []string{
+		"serve",
+		"-v",
+		"-a",
+		e.addr,
+		"--qlog",
+		"server.qlog",
+		"--video-src",
+		e.AbsFile,
+		"--handler",
+		e.Handler,
+	}
+
+	if e.CongestionControl == "scream" {
+		cmd = append(cmd, "-s")
+		cmd = append(cmd, "--scream-logger", "scream.log")
+	}
+	return cmd
+}
+
+func (e experiment) clientCmd() []string {
+	cmd := []string{
+		"stream",
+		"-v",
+		"-a",
+		e.addr,
+		"--qlog",
+		"client.qlog",
+		"--video-sink",
+		fmt.Sprintf("streamed-%v", e.BaseFile),
+		"--handler",
+		e.Handler,
+	}
+
+	if e.CongestionControl == "scream" {
+		cmd = append(cmd, "-s")
+		cmd = append(cmd, "--feedback-frequency", fmt.Sprintf("%v", e.FeedbackFrequency.Milliseconds()))
+	}
+	return cmd
+}
+
+func (e *experiment) setup(binary string) error {
+	// Create and change to new directory
+	err := os.Mkdir(e.String(), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = os.Chdir(e.String())
+	if err != nil {
+		return err
+	}
+
+	// generate server and client commands
+	serveLogFile, err := os.Create("serve.log")
+	if err != nil {
+		fmt.Printf("could not touch serve log: %v", err)
+		return err
+	}
+	e.serve = exec.Command("ip", append([]string{"netns", "exec", "ns1", binary}, e.serveCmd()...)...)
+	e.serve.Stdout = serveLogFile
+	e.serve.Stderr = serveLogFile
+	e.ServeCMD = strings.Join(append([]string{e.serve.Path}, e.serve.Args...), " ")
+
+	clientLogFile, err := os.Create("client.log")
+	if err != nil {
+		fmt.Printf("could not touch client log: %v", err)
+		return err
+	}
+	e.stream = exec.Command("ip", append([]string{"netns", "exec", "ns2", binary}, e.clientCmd()...)...)
+	e.stream.Stdout = clientLogFile
+	e.stream.Stderr = clientLogFile
+	e.StreamCMD = strings.Join(append([]string{e.stream.Path}, e.stream.Args...), " ")
+
+	// Write config file
+	file, err := json.MarshalIndent(e, "", "	")
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile("config.json", file, 0644)
+	if err != nil {
+		return err
+	}
+
+	if e.Bandwidth > 0 {
+		err = setBandwidth(e.Bandwidth)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *experiment) Teardown() error {
+	// stop server
+	if err := e.serve.Process.Kill(); err != nil {
+		fmt.Printf("could not kill serve cmd: %v\n", err)
+		return err
+	}
+
+	ffmpegLog := "ffmpeg.log"
+	ffmpegLogFile, err := os.Create(ffmpegLog)
+	if err != nil {
+		fmt.Printf("could not touch ffmpeg log: %v", err)
+		return err
+	}
+	ffmpeg := exec.Command(
+		"ffmpeg",
+		"-i",
+		e.AbsFile,
+		"-i",
+		fmt.Sprintf("streamed-%v", e.BaseFile),
+		"-lavfi",
+		"ssim=ssim.log;[0:v][1:v]psnr=psnr.log",
+		"-f",
+		"null",
+		"-",
+	)
+	ffmpeg.Stdout = ffmpegLogFile
+	ffmpeg.Stderr = ffmpegLogFile
+	err = ffmpeg.Run()
+	if err != nil {
+		fmt.Printf("could not run ffmpeg: %v\n", err)
+	}
+
+	if e.u != nil {
+		if err := e.u.Upload("."); err != nil {
+			log.Printf("failed to upload experiment: %v\n", err)
+		}
+	}
+
+	f := fmt.Sprintf("streamed-%v", e.BaseFile)
+	err = os.Remove(f)
+	if err != nil {
+		fmt.Printf("could not remove file %v: %v\n", f, err)
+	}
+
+	if e.Bandwidth > 0 {
+		err = deleteBandwidthLimit()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = os.Chdir("..")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *experiment) Run() error {
+	err := e.serve.Start()
+	if err != nil {
+		fmt.Printf("could not run server: %v\n", err)
+		return err
+	}
+
+	err = e.stream.Start()
+	if err != nil {
+		fmt.Printf("could not start stream client: %v\n", err)
+		return err
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- e.stream.Wait()
+	}()
+	select {
+	case <-time.After(3 * time.Minute):
+		if err := e.stream.Process.Kill(); err != nil {
+			fmt.Printf("could not kill process: %v\n", err)
+		}
+		fmt.Printf("stream client process killed after timeout:\n%v\n", e.clientCmd())
+	case err := <-done:
+		if err != nil {
+			fmt.Printf("stream client process finished with error: %v\nconfig: %v\n", err, e)
+		}
+	}
+	return nil
+}
+
+func setBandwidth(b Bitrate) error {
+	var err error
+	for i := 1; i <= 2; i++ {
+		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "add", "dev", fmt.Sprintf("veth%v", i), "root", "netem", "rate", fmt.Sprintf("%v", b))
+		tc.Stdout = os.Stdout
+		tc.Stderr = os.Stderr
+		err1 := tc.Run()
+		if err1 != nil {
+			fmt.Printf("tc add for ns%v returned error: %v\n", i, err)
+			err = fmt.Errorf("%v, %v", err, err1)
+		}
+	}
+	return err
+}
+
+func deleteBandwidthLimit() error {
+	var err error
+	for i := 1; i <= 2; i++ {
+		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "delete", "dev", fmt.Sprintf("veth%v", i), "root")
+		tc.Stdout = os.Stdout
+		tc.Stderr = os.Stderr
+		err1 := tc.Run()
+		if err1 != nil {
+			fmt.Printf("tc delete for ns%v returned error: %v\n", i, err)
+			err = fmt.Errorf("%v, %v", err, err1)
+		}
+	}
+	return err
+}
+
+// Evaluator runs experiments for all valid combinations of the given configurations
+type Evaluator struct {
+	InputFiles            []string
+	Bandwidths            []Bitrate
+	CongestionControllers []string
+	Handlers              []string
+	FeedbackFrequencies   []time.Duration
+}
+
+func (e *Evaluator) buildExperiments() []*experiment {
+	lens := []int{
+		len(e.InputFiles),
+		len(e.Bandwidths),
+		len(e.CongestionControllers),
+		len(e.Handlers),
+	}
+	gen := combin.NewCartesianGenerator(lens)
+	var experiments []*experiment
+	for gen.Next() {
+		p := gen.Product(nil)
+		c := &experiment{
+			Filename:          e.InputFiles[p[0]],
+			Bandwidth:         e.Bandwidths[p[1]],
+			CongestionControl: e.CongestionControllers[p[2]],
+			Handler:           e.Handlers[p[3]],
+		}
+
+		if c.CongestionControl != "none" {
+			for _, ff := range e.FeedbackFrequencies {
+				experiments = append(experiments, &experiment{
+					Filename:          c.Filename,
+					Bandwidth:         c.Bandwidth,
+					CongestionControl: c.CongestionControl,
+					Handler:           c.Handler,
+					FeedbackFrequency: ff,
+				})
+			}
+		} else {
+			experiments = append(experiments, c)
+		}
+	}
+	return initFilePaths(experiments)
+}
+
+func initFilePaths(raw []*experiment) []*experiment {
+	for _, e := range raw {
+		abs, err := filepath.Abs(e.Filename)
+		if err != nil {
+			panic(err)
+		}
+		base := filepath.Base(e.Filename)
+		e.AbsFile = abs
+		e.BaseFile = base
+	}
+	return raw
+}
+
+func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr string, upload bool) error {
+	experiments := e.buildExperiments()
+
+	binary, err := os.Executable()
+	if err != nil {
+		log.Printf("can't find executable to run: %v\n", err)
+		return err
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		fmt.Printf("could not get hostname, using 'unknownhost', err: %v\n", err)
+		hostname = "unknownhost"
+	}
+
+	expDir := filepath.Join(dataDir, commit, hostname)
+	err = os.MkdirAll(expDir, os.ModePerm)
+	if err != nil {
+		log.Printf("can't prepare output directory: %v\n", err)
+		return err
+	}
+
+	err = os.Chdir(expDir)
+	if err != nil {
+		log.Printf("can't change into output directory: %v\n", err)
+		return err
+	}
+
+	var u *uploader
+	if upload {
+		u, err = NewUploader()
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Printf("running %v configs", len(experiments))
+	for _, e := range experiments {
+		e.Version = version
+		e.Commit = commit
+		e.CommitTimestamp = timestamp
+		e.addr = addr
+		e.u = u
+		err := e.setup(binary)
+		if err != nil {
+			return err
+		}
+		err = e.Run()
+		if err != nil {
+			return err
+		}
+		err = e.Teardown()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

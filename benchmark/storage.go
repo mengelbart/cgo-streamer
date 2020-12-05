@@ -30,13 +30,23 @@ const (
 )
 
 type document struct {
-	File              string            `json:"file"`
-	Bandwidth         int64             `json:"bandwidth"`
-	CongestionControl string            `json:"congestion_control"`
-	Handler           string            `json:"handler"`
-	FeedbackFrequency time.Duration     `json:"feedback_frequency"`
-	Version           string            `json:"version"`
-	Data              map[string]string `json:"data"`
+	Filename          string        `json:"filename" firestore:"filename"`
+	Bandwidth         int64         `json:"bandwidth" firestore:"bandwidth"`
+	CongestionControl string        `json:"congestion_control" firestore:"congestion_control"`
+	Handler           string        `json:"handler" firestore:"handler"`
+	FeedbackFrequency time.Duration `json:"feedback_frequency" firestore:"feedback_frequency"`
+	RequestKeyFrames  bool          `json:"request_key_frames" firestore:"request_key_frames"`
+	Iperf             bool          `json:"iperf" firestore:"iperf"`
+
+	ServeCMD  string `json:"server_cmd" firestore:"server_cmd"`
+	StreamCMD string `json:"client_cmd" firestore:"client_cmd"`
+
+	Version             string `json:"version" firestore:"version"`
+	Commit              string `json:"commit" firestore:"commit"`
+	CommitTimestamp     string `json:"commit_timestamp" firestore:"commit_timestamp"`
+	ExperimentTimestamp string `json:"experiment_timestamp" firestore:"experiment_timestamp"`
+
+	Data map[string]string `json:"data" firestore:"data"`
 }
 
 type uploader struct {
@@ -91,13 +101,20 @@ func (u *uploader) Upload(path string) error {
 		return err
 	}
 	d := &document{
-		File:              e.BaseFile,
-		Bandwidth:         int64(e.Bandwidth),
-		CongestionControl: e.CongestionControl,
-		Handler:           e.Handler,
-		FeedbackFrequency: e.FeedbackFrequency,
-		Version:           e.Version,
-		Data:              make(map[string]string),
+		Filename:            e.BaseFile,
+		Bandwidth:           int64(e.Bandwidth),
+		CongestionControl:   e.CongestionControl,
+		Handler:             e.Handler,
+		FeedbackFrequency:   e.FeedbackFrequency,
+		RequestKeyFrames:    e.RequestKeyFrames,
+		Iperf:               e.Iperf,
+		ServeCMD:            e.ServeCMD,
+		StreamCMD:           e.StreamCMD,
+		Version:             e.Version,
+		Commit:              e.Commit,
+		CommitTimestamp:     e.CommitTimestamp,
+		ExperimentTimestamp: e.ExperimentTimestamp,
+		Data:                make(map[string]string),
 	}
 	expName, err := uuid.NewRandom()
 	if err != nil {

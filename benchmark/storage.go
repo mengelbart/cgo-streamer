@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -76,7 +77,11 @@ func (u *uploader) Close() error {
 }
 
 func (u *uploader) Upload(path string) error {
-	log.Printf("uploading experiment: %v\n", path)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	log.Printf("uploading experiment: %v\n", abs)
 	e, err := parseConfig(filepath.Join(path, "config.json"))
 	if err != nil {
 		return err
@@ -100,7 +105,7 @@ func (u *uploader) Upload(path string) error {
 	}
 	for _, f := range files {
 		name := f.Name()
-		dataFilePath := filepath.Join(path, name)
+		dataFilePath := filepath.Join(abs, name)
 		convert, ok := converterMap[name]
 		if !ok {
 			continue
@@ -192,12 +197,12 @@ func (c converterFunc) convert(path string) (map[string]*DataTable, error) {
 }
 
 var converterMap = map[string]converterFunc{
-	"ssim.log":   getImageMetricConverter(0, 4, "SSIM"),
-	"psnr.log":   getImageMetricConverter(0, 5, "PSNR"),
+	"ssim.log":   getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
+	"psnr.log":   getImageMetricConverter(0, 5, "PSNR", parseAndBound),
 	"scream.log": screamConverter,
 }
 
-func getImageMetricConverter(first, second int, label string) converterFunc {
+func getImageMetricConverter(first, second int, label string, parseFloat func(string, int) (float64, error)) converterFunc {
 	return func(path string) (map[string]*DataTable, error) {
 		csvFile, err := os.Open(path)
 		if err != nil {
@@ -239,7 +244,7 @@ func getImageMetricConverter(first, second int, label string) converterFunc {
 				return nil, err
 			}
 			vStr := strings.Split(record[second], ":")[1]
-			v, err := strconv.ParseFloat(vStr, 64)
+			v, err := parseFloat(vStr, 64)
 			dt.Rows = append(dt.Rows, Row{[]Cell{
 				{
 					V: n,
@@ -255,6 +260,17 @@ func getImageMetricConverter(first, second int, label string) converterFunc {
 			label: dt,
 		}, csvFile.Close()
 	}
+}
+
+func parseAndBound(n string, bitSize int) (float64, error) {
+	float, err := strconv.ParseFloat(n, bitSize)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsInf(float, 0) {
+		return 1, nil
+	}
+	return float / (1 + float), nil
 }
 
 func screamConverter(path string) (map[string]*DataTable, error) {

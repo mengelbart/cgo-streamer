@@ -26,7 +26,7 @@ for more information).`,
 }
 
 func upload() error {
-	uploader, err := benchmark.NewUploader()
+	uploader, err := benchmark.NewUploader(Commit)
 	if err != nil {
 		return err
 	}

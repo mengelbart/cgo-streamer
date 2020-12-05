@@ -419,7 +419,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 
 	var u *uploader
 	if upload {
-		u, err = NewUploader()
+		u, err = NewUploader(commit)
 		if err != nil {
 			return err
 		}

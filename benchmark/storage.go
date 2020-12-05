@@ -52,9 +52,11 @@ type document struct {
 type uploader struct {
 	s *storage.Client
 	f *firestore.Client
+
+	prefix string
 }
 
-func NewUploader() (*uploader, error) {
+func NewUploader(prefix string) (*uploader, error) {
 	ctx := context.Background()
 	fs, err := firestore.NewClient(ctx, projectID)
 	if err != nil {
@@ -73,8 +75,9 @@ func NewUploader() (*uploader, error) {
 		return nil, err
 	}
 	return &uploader{
-		s: s,
-		f: fs,
+		s:      s,
+		f:      fs,
+		prefix: prefix,
 	}, nil
 }
 
@@ -133,7 +136,7 @@ func (u *uploader) Upload(path string) error {
 			continue
 		}
 		for name, dt := range data {
-			link, err := u.store(filepath.Join(expName.String(), name), dt)
+			link, err := u.store(filepath.Join(u.prefix, expName.String(), name), dt)
 			if err != nil {
 				log.Printf("failed to upload object %v: %v\n", dataFilePath, err)
 				continue

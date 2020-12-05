@@ -61,9 +61,13 @@ func (e experiment) String() string {
 	)
 	if e.RequestKeyFrames {
 		name = fmt.Sprintf("%v-k", name)
+	} else {
+		name = fmt.Sprintf("%v-nk", name)
 	}
 	if e.Iperf {
 		name = fmt.Sprintf("%v-i", name)
+	} else {
+		name = fmt.Sprintf("%v-ni", name)
 	}
 	return name
 }
@@ -347,6 +351,8 @@ func (e *Evaluator) buildExperiments() []*experiment {
 		len(e.CongestionControllers),
 		len(e.Handlers),
 		len(e.Iperf),
+		len(e.FeedbackFrequencies),
+		len(e.RequestKeyFrames),
 	}
 	gen := combin.NewCartesianGenerator(lens)
 	var experiments []*experiment
@@ -358,25 +364,14 @@ func (e *Evaluator) buildExperiments() []*experiment {
 			CongestionControl: e.CongestionControllers[p[2]],
 			Handler:           e.Handlers[p[3]],
 			Iperf:             e.Iperf[p[4]],
+			FeedbackFrequency: e.FeedbackFrequencies[p[5]],
+			RequestKeyFrames:  e.RequestKeyFrames[p[6]],
 		}
-
-		if c.CongestionControl != "none" {
-			ccLens := []int{len(e.FeedbackFrequencies), len(e.RequestKeyFrames)}
-			ccGen := combin.NewCartesianGenerator(ccLens)
-			for ccGen.Next() {
-				ccp := ccGen.Product(nil)
-				experiments = append(experiments, &experiment{
-					Filename:          c.Filename,
-					Bandwidth:         c.Bandwidth,
-					CongestionControl: c.CongestionControl,
-					Handler:           c.Handler,
-					FeedbackFrequency: e.FeedbackFrequencies[ccp[0]],
-					RequestKeyFrames:  e.RequestKeyFrames[ccp[1]],
-				})
-			}
-		} else {
-			experiments = append(experiments, c)
+		// filter redundant none cc settings, RequestKeyFrames and FeedbackFrequency don't make sense without cc
+		if c.CongestionControl == "none" && (c.RequestKeyFrames || c.FeedbackFrequency != 1*time.Millisecond) {
+			continue
 		}
+		experiments = append(experiments, c)
 	}
 	return initFilePaths(experiments)
 }

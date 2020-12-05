@@ -133,7 +133,6 @@ func (u *uploader) store(path string, dt *DataTable) (string, error) {
 	defer cancel()
 	bkt := u.s.Bucket(experimentBucket)
 	obj := bkt.Object(path + ".json")
-	log.Println(obj.ObjectName())
 	w := obj.NewWriter(ctx)
 	defer w.Close()
 	bs, err := json.Marshal(dt)
@@ -423,7 +422,7 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 	}
 	return map[string]*DataTable{
 		"scream-congestion":   congestion,
-		"scream-Bitrate":      bitrate,
+		"scream-bitrate":      bitrate,
 		"scream-queue-length": queueLength,
 	}, csvFile.Close()
 }

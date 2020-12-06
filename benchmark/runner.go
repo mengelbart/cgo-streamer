@@ -39,6 +39,7 @@ type experiment struct {
 
 	serve  *exec.Cmd
 	stream *exec.Cmd
+	files  []*os.File
 
 	Version                  string `json:"version"`
 	Commit                   string `json:"commit"`
@@ -119,11 +120,18 @@ func (e experiment) clientCmd() []string {
 
 func (e *experiment) setup(binary string) error {
 	// Create and change to new directory
-	err := os.Mkdir(e.String(), os.ModePerm)
+	dirName := e.String()
+	if _, err := os.Stat(dirName); !os.IsNotExist(err) {
+		err := os.RemoveAll(dirName)
+		if err != nil {
+			return err
+		}
+	}
+	err := os.Mkdir(dirName, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	err = os.Chdir(e.String())
+	err = os.Chdir(dirName)
 	if err != nil {
 		return err
 	}
@@ -134,6 +142,7 @@ func (e *experiment) setup(binary string) error {
 		fmt.Printf("could not touch serve log: %v", err)
 		return err
 	}
+	e.files = append(e.files, serveLogFile)
 	e.serve = exec.Command("ip", append([]string{"netns", "exec", "ns1", binary}, e.serveCmd()...)...)
 	e.serve.Stdout = serveLogFile
 	e.serve.Stderr = serveLogFile
@@ -144,6 +153,7 @@ func (e *experiment) setup(binary string) error {
 		fmt.Printf("could not touch client log: %v", err)
 		return err
 	}
+	e.files = append(e.files, clientLogFile)
 	e.stream = exec.Command("ip", append([]string{"netns", "exec", "ns2", binary}, e.clientCmd()...)...)
 	e.stream.Stdout = clientLogFile
 	e.stream.Stderr = clientLogFile
@@ -182,6 +192,7 @@ func (e *experiment) Teardown() error {
 		fmt.Printf("could not touch ffmpeg log: %v", err)
 		return err
 	}
+	e.files = append(e.files, ffmpegLogFile)
 	ffmpeg := exec.Command(
 		"ffmpeg",
 		"-i",
@@ -217,6 +228,13 @@ func (e *experiment) Teardown() error {
 		err = deleteBandwidthLimit()
 		if err != nil {
 			return err
+		}
+	}
+
+	for _, f := range e.files {
+		err = f.Close()
+		if err != nil {
+			log.Printf("failed to close file: %v\n", f.Name())
 		}
 	}
 

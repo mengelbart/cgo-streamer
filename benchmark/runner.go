@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,10 +40,11 @@ type experiment struct {
 	serve  *exec.Cmd
 	stream *exec.Cmd
 
-	Version             string `json:"version"`
-	Commit              string `json:"commit"`
-	CommitTimestamp     string `json:"commit_timestamp"`
-	ExperimentTimestamp string `json:"experiment_timestamp"`
+	Version                  string `json:"version"`
+	Commit                   string `json:"commit"`
+	CommitTimestamp          string `json:"commit_timestamp"`
+	ExperimentStartTimestamp string `json:"experiment_start_timestamp"`
+	ExperimentEndTimestamp   string `json:"experiment_end_timestamp"`
 
 	addr string
 	port string
@@ -226,6 +228,10 @@ func (e *experiment) Teardown() error {
 }
 
 func (e *experiment) Run() error {
+	e.ExperimentStartTimestamp = strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	defer func() {
+		e.ExperimentEndTimestamp = strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	}()
 	err := e.serve.Start()
 	if err != nil {
 		fmt.Printf("could not run server: %v\n", err)
@@ -239,6 +245,22 @@ func (e *experiment) Run() error {
 	}
 
 	if e.Iperf {
+		iperf3Server := exec.Command(
+			"ip",
+			"netns",
+			"exec",
+			"ns1",
+			"iperf3",
+			"-s",
+			"-B",
+			e.addr,
+			"--logfile",
+			"iperf3server.log",
+			"-J",
+		)
+		iperf3Server.Stdout = os.Stdout
+		iperf3Server.Stderr = os.Stderr
+
 		cancel := time.AfterFunc(15*time.Second, func() {
 			iperf3Client := exec.Command(
 				"ip",
@@ -262,22 +284,11 @@ func (e *experiment) Run() error {
 			if err2 != nil {
 				log.Printf("failed to run iperf3 client: %v", err2)
 			}
+			err2 = iperf3Server.Process.Kill()
+			if err2 != nil {
+				log.Printf("failed to run iperf3 client: %v", err2)
+			}
 		})
-		iperf3Server := exec.Command(
-			"ip",
-			"netns",
-			"exec",
-			"ns1",
-			"iperf3",
-			"-s",
-			"-B",
-			e.addr,
-			"--logfile",
-			"iperf3server.log",
-			"-J",
-		)
-		iperf3Server.Stdout = os.Stdout
-		iperf3Server.Stderr = os.Stderr
 		err = iperf3Server.Start()
 		if err != nil {
 			log.Printf("failed to run iperf3 server: %v", err)
@@ -293,11 +304,14 @@ func (e *experiment) Run() error {
 	case <-time.After(3 * time.Minute):
 		if err := e.stream.Process.Kill(); err != nil {
 			fmt.Printf("could not kill process: %v\n", err)
+			return err
 		}
 		fmt.Printf("stream client process killed after timeout:\n%v\n", e.clientCmd())
+		return err
 	case err := <-done:
 		if err != nil {
 			fmt.Printf("stream client process finished with error: %v\nconfig: %v\n", err, e)
+			return err
 		}
 	}
 	return nil
@@ -426,6 +440,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 	}
 
 	log.Printf("running %v configs", len(experiments))
+	var retries []*experiment
 	for _, e := range experiments {
 		e.Version = version
 		e.Commit = commit
@@ -435,15 +450,33 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		e.u = u
 		err := e.setup(binary)
 		if err != nil {
-			return err
+			log.Printf("failed setup experiment, queuing for retry: %v, %v\n", e, err)
+			retries = append(retries, e)
+			continue
 		}
 		err = e.Run()
 		if err != nil {
-			return err
+			log.Printf("failed run experiment, queuing for retry: %v, %v\n", e, err)
+			retries = append(retries, e)
 		}
 		err = e.Teardown()
 		if err != nil {
-			return err
+			log.Printf("failed tear down experiment: %v, %v\n", e, err)
+		}
+	}
+	for _, e := range retries {
+		err := e.setup(binary)
+		if err != nil {
+			log.Printf("repeatedly failed to setup experiment: %v, %v\n", e, err)
+			continue
+		}
+		err = e.Run()
+		if err != nil {
+			log.Printf("repeatedly failed to run experiment: %v, %v\n", e, err)
+		}
+		err = e.Teardown()
+		if err != nil {
+			log.Printf("failed tear down experiment: %v, %v\n", e, err)
 		}
 	}
 	return nil

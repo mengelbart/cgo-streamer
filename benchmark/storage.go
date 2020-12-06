@@ -41,10 +41,11 @@ type document struct {
 	ServeCMD  string `json:"server_cmd" firestore:"server_cmd"`
 	StreamCMD string `json:"client_cmd" firestore:"client_cmd"`
 
-	Version             string `json:"version" firestore:"version"`
-	Commit              string `json:"commit" firestore:"commit"`
-	CommitTimestamp     string `json:"commit_timestamp" firestore:"commit_timestamp"`
-	ExperimentTimestamp string `json:"experiment_timestamp" firestore:"experiment_timestamp"`
+	Version                  string `json:"version" firestore:"version"`
+	Commit                   string `json:"commit" firestore:"commit"`
+	CommitTimestamp          string `json:"commit_timestamp" firestore:"commit_timestamp"`
+	ExperimentStartTimestamp string `json:"experiment_start_timestamp" firestore:"experiment_start_timestamp"`
+	ExperimentEndTimestamp   string `json:"experiment_end_timestamp" firestore:"experiment_end_timestamp"`
 
 	Data map[string]string `json:"data" firestore:"data"`
 }
@@ -104,20 +105,21 @@ func (u *uploader) Upload(path string) error {
 		return err
 	}
 	d := &document{
-		Filename:            e.BaseFile,
-		Bandwidth:           int64(e.Bandwidth),
-		CongestionControl:   e.CongestionControl,
-		Handler:             e.Handler,
-		FeedbackFrequency:   e.FeedbackFrequency,
-		RequestKeyFrames:    e.RequestKeyFrames,
-		Iperf:               e.Iperf,
-		ServeCMD:            e.ServeCMD,
-		StreamCMD:           e.StreamCMD,
-		Version:             e.Version,
-		Commit:              e.Commit,
-		CommitTimestamp:     e.CommitTimestamp,
-		ExperimentTimestamp: e.ExperimentTimestamp,
-		Data:                make(map[string]string),
+		Filename:                 e.BaseFile,
+		Bandwidth:                int64(e.Bandwidth),
+		CongestionControl:        e.CongestionControl,
+		Handler:                  e.Handler,
+		FeedbackFrequency:        e.FeedbackFrequency,
+		RequestKeyFrames:         e.RequestKeyFrames,
+		Iperf:                    e.Iperf,
+		ServeCMD:                 e.ServeCMD,
+		StreamCMD:                e.StreamCMD,
+		Version:                  e.Version,
+		Commit:                   e.Commit,
+		CommitTimestamp:          e.CommitTimestamp,
+		ExperimentStartTimestamp: e.ExperimentStartTimestamp,
+		ExperimentEndTimestamp:   e.ExperimentEndTimestamp,
+		Data:                     make(map[string]string),
 	}
 	expName, err := uuid.NewRandom()
 	if err != nil {

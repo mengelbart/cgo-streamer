@@ -321,14 +321,14 @@ func (e *experiment) Run() error {
 	select {
 	case <-time.After(3 * time.Minute):
 		if err := e.stream.Process.Kill(); err != nil {
-			fmt.Printf("could not kill process: %v\n", err)
+			log.Printf("could not kill process: %v\n", err)
 			return err
 		}
-		fmt.Printf("stream client process killed after timeout:\n%v\n", e.clientCmd())
-		return err
+		log.Printf("stream client process killed after timeout:\n%v\n", e.clientCmd())
+		return nil
 	case err := <-done:
 		if err != nil {
-			fmt.Printf("stream client process finished with error: %v\nconfig: %v\n", err, e)
+			log.Printf("stream client process finished with error: %v\nconfig: %v\n", err, e)
 			return err
 		}
 	}
@@ -481,6 +481,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		if err != nil {
 			log.Printf("failed tear down experiment: %v, %v\n", e, err)
 		}
+		time.Sleep(15 * time.Second)
 	}
 	for _, e := range retries {
 		err := e.setup(binary)
@@ -496,6 +497,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		if err != nil {
 			log.Printf("failed tear down experiment: %v, %v\n", e, err)
 		}
+		time.Sleep(15 * time.Second)
 	}
 	return nil
 }

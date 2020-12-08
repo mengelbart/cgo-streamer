@@ -286,6 +286,7 @@ func (e *experiment) Run() error {
 				"exec",
 				"ns2",
 				"iperf3",
+				"-u",
 				"-c",
 				e.addr,
 				"-b",
@@ -458,7 +459,10 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 	}
 
 	log.Printf("running %v configs", len(experiments))
-	var retries []*experiment
+	var failed []struct {
+		err error
+		ex  *experiment
+	}
 	for _, e := range experiments {
 		e.Version = version
 		e.Commit = commit
@@ -469,13 +473,19 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		err := e.setup(binary)
 		if err != nil {
 			log.Printf("failed setup experiment, queuing for retry: %v, %v\n", e, err)
-			retries = append(retries, e)
+			failed = append(failed, struct {
+				err error
+				ex  *experiment
+			}{err: err, ex: e})
 			continue
 		}
 		err = e.Run()
 		if err != nil {
 			log.Printf("failed run experiment, queuing for retry: %v, %v\n", e, err)
-			retries = append(retries, e)
+			failed = append(failed, struct {
+				err error
+				ex  *experiment
+			}{err: err, ex: e})
 		}
 		err = e.Teardown()
 		if err != nil {
@@ -483,21 +493,9 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		}
 		time.Sleep(15 * time.Second)
 	}
-	for _, e := range retries {
-		err := e.setup(binary)
-		if err != nil {
-			log.Printf("repeatedly failed to setup experiment: %v, %v\n", e, err)
-			continue
-		}
-		err = e.Run()
-		if err != nil {
-			log.Printf("repeatedly failed to run experiment: %v, %v\n", e, err)
-		}
-		err = e.Teardown()
-		if err != nil {
-			log.Printf("failed tear down experiment: %v, %v\n", e, err)
-		}
-		time.Sleep(15 * time.Second)
+	log.Println("finished evaluation, failed to run the following experiments:")
+	for _, e := range failed {
+		log.Printf("%v, err: %v\n", e.ex, e.err)
 	}
 	return nil
 }

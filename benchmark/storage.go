@@ -220,6 +220,7 @@ func (c converterFunc) convert(path string) (map[string]*DataTable, error) {
 var converterMap = map[string]converterFunc{
 	"ssim.log":   getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
 	"psnr.log":   getImageMetricConverter(0, 5, "PSNR", parseAndBound),
+	"rtcp.log":   rtcpConverter,
 	"scream.log": screamConverter,
 }
 
@@ -446,5 +447,66 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 		"scream-congestion":   congestion,
 		"scream-bitrate":      bitrate,
 		"scream-queue-length": queueLength,
+	}, csvFile.Close()
+}
+
+func rtcpConverter(path string) (map[string]*DataTable, error) {
+	csvFile, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	// defer Close for cases of early return in case of another error
+	defer csvFile.Close()
+	r := csv.NewReader(csvFile)
+	r.Comma = ' '
+	r.TrimLeadingSpace = true
+
+	rtcp := &DataTable{
+		Cols: []Col{
+			{
+				T:     "number",
+				ID:    "col_1",
+				Label: "time",
+			},
+			{
+				T:     "number",
+				ID:    "col_2",
+				Label: "rtcp",
+			},
+		},
+		Rows: []Row{},
+	}
+
+	timeCol := 0
+	rtcpCol := 1
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		t, err := strconv.ParseFloat(record[timeCol], 64)
+		if err != nil {
+			return nil, err
+		}
+		r, err := strconv.ParseFloat(record[rtcpCol], 64)
+		if err != nil {
+			return nil, err
+		}
+		rtcp.Rows = append(rtcp.Rows, Row{[]Cell{
+			{
+				V: t,
+				F: record[timeCol],
+			},
+			{
+				V: r,
+				F: record[rtcpCol],
+			},
+		}})
+	}
+	return map[string]*DataTable{
+		"rtcp-overhead": rtcp,
 	}, csvFile.Close()
 }

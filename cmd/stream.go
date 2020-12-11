@@ -19,12 +19,14 @@ import (
 var VideoSink string
 var FeedbackFreq int
 var SendImmediateFeedback bool
+var RTCPLogFile string
 
 func init() {
 	rootCmd.AddCommand(streamCmd)
 	streamCmd.Flags().StringVar(&VideoSink, "video-sink", "autovideosink", "File to save video")
 	streamCmd.Flags().IntVarP(&FeedbackFreq, "feedback-frequency", "f", 500, "Frequency in which scream feedback is sent in ms")
 	streamCmd.Flags().BoolVarP(&SendImmediateFeedback, "immediate-feedback", "i", false, "Send SCReAM Feedback immediately when a new RTP Packet was received.")
+	streamCmd.Flags().StringVar(&RTCPLogFile, "rtcp-logger", "stdout", "Log file for rtcp statistics, 'stdout' prints to stdout, otherwise creates a new file")
 }
 
 var streamCmd = &cobra.Command{
@@ -63,7 +65,12 @@ func run() error {
 			return err
 		}
 		closeChans = append(closeChans, c)
-		go screamWriter.Run(sender)
+		writer, close, err := getRTCPStatWriter(sender, RTCPLogFile)
+		if err != nil {
+			return err
+		}
+		defer close()
+		go screamWriter.Run(writer)
 	} else {
 		client = newClient(Handler, Addr, pipeline, QLOGFile)
 	}
@@ -101,6 +108,53 @@ type FeedbackRunner interface {
 	Runner
 	RunFeedbackSender() (io.Writer, chan<- struct{}, error)
 	CloseChan() chan struct{}
+}
+
+type rtcpStatsWriter struct {
+	l       *log.Logger
+	t       time.Time
+	counter chan int
+	stop    chan struct{}
+}
+
+func (r *rtcpStatsWriter) run() {
+	count := 0
+	t := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case c := <-r.counter:
+			count += c
+		case <-t.C:
+			r.l.Printf("%v %v", time.Since(r.t).Milliseconds(), count)
+			count = 0
+		case <-r.stop:
+			return
+		}
+	}
+}
+
+func (r rtcpStatsWriter) Write(p []byte) (int, error) {
+	r.counter <- len(p)
+	return len(p), nil
+}
+
+func (r *rtcpStatsWriter) Close() {
+	close(r.stop)
+}
+
+func getRTCPStatWriter(w io.Writer, rtcpStatsFile string) (io.Writer, func(), error) {
+	create, err := os.Create(rtcpStatsFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	rtcpWriter := rtcpStatsWriter{
+		l:       log.New(create, "", 0),
+		t:       time.Now(),
+		counter: make(chan int),
+		stop:    make(chan struct{}),
+	}
+	go rtcpWriter.run()
+	return io.MultiWriter(w, rtcpWriter), rtcpWriter.Close, nil
 }
 
 func newClient(handler string, addr string, w io.Writer, qlogFile string) FeedbackRunner {

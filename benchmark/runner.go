@@ -113,7 +113,14 @@ func (e experiment) clientCmd() []string {
 	}
 
 	if e.CongestionControl == "scream" {
-		cmd = append(cmd, "-s", "--feedback-frequency", fmt.Sprintf("%v", e.FeedbackFrequency.Milliseconds()))
+		cmd = append(
+			cmd,
+			"-s",
+			"--feedback-frequency",
+			fmt.Sprintf("%v", e.FeedbackFrequency.Milliseconds()),
+			"--rtcp-logger",
+			"rtcp.log",
+		)
 	}
 	return cmd
 }

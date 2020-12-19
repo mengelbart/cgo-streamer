@@ -24,7 +24,7 @@ var RequestKeyFrames bool
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&VideoSrc, "video-src", "videotestsrc", "Video file")
-	serveCmd.Flags().IntVarP(&Bitrate, "bitrate", "b", 2048, "initial encoder bitrate")
+	serveCmd.Flags().IntVarP(&Bitrate, "bitrate", "b", 500, "initial encoder bitrate")
 	serveCmd.Flags().StringVar(&ScreamLogFile, "scream-logger", "stdout", "Log file for scream statistics, 'stdout' prints to stdout, otherwise creates a new file")
 	serveCmd.Flags().BoolVarP(&RequestKeyFrames, "request-key-frames", "k", false, "Request extra key frames when using SCReAM")
 }

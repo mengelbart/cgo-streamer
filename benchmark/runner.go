@@ -24,6 +24,7 @@ const (
 )
 
 type experiment struct {
+	ID                string        `json:"id"`
 	Filename          string        `json:"filename"`
 	AbsFile           string        `json:"absolute_filename"`
 	BaseFile          string        `json:"base_filename"`
@@ -127,7 +128,7 @@ func (e experiment) clientCmd() []string {
 
 func (e *experiment) setup(binary string) error {
 	// Create and change to new directory
-	dirName := e.String()
+	dirName := fmt.Sprintf("%v", e.ID)
 	if _, err := os.Stat(dirName); !os.IsNotExist(err) {
 		err := os.RemoveAll(dirName)
 		if err != nil {
@@ -245,10 +246,6 @@ func (e *experiment) Teardown() error {
 		}
 	}
 
-	err = os.Chdir("..")
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -432,6 +429,11 @@ func initFilePaths(raw []*experiment) []*experiment {
 func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port string, upload bool) error {
 	experiments := e.buildExperiments()
 
+	envScript, err := filepath.Abs("./vnetns.sh")
+	if err != nil {
+		return err
+	}
+
 	binary, err := os.Executable()
 	if err != nil {
 		log.Printf("can't find executable to run: %v\n", err)
@@ -444,16 +446,13 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		hostname = "unknownhost"
 	}
 
-	expDir := filepath.Join(dataDir, commit, hostname)
+	expDir, err := filepath.Abs(filepath.Join(dataDir, commit, hostname))
+	if err != nil {
+		return err
+	}
 	err = os.MkdirAll(expDir, os.ModePerm)
 	if err != nil {
 		log.Printf("can't prepare output directory: %v\n", err)
-		return err
-	}
-
-	err = os.Chdir(expDir)
-	if err != nil {
-		log.Printf("can't change into output directory: %v\n", err)
 		return err
 	}
 
@@ -470,16 +469,39 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		err error
 		ex  *experiment
 	}
-	for _, e := range experiments {
+	for i, e := range experiments {
+
+		err = os.Chdir(expDir)
+		if err != nil {
+			log.Printf("can't change into output directory: %v\n", err)
+			return err
+		}
+
+		// clean up environment from previous runs (network ns+interfaces)
+		down := exec.Command(envScript, "down")
+		down.Stderr = os.Stderr
+		_ = down.Run()
+
+		time.Sleep(1 * time.Second)
+
+		up := exec.Command(envScript, "up")
+		up.Stderr = os.Stderr
+		err := up.Run()
+		if err != nil {
+			return err
+		}
+
+		e.ID = fmt.Sprintf("%v", i)
 		e.Version = version
 		e.Commit = commit
 		e.CommitTimestamp = timestamp
 		e.addr = addr
 		e.port = port
 		e.u = u
-		err := e.setup(binary)
+
+		err = e.setup(binary)
 		if err != nil {
-			log.Printf("failed setup experiment, queuing for retry: %v, %v\n", e, err)
+			log.Printf("failed setup experiment: %v, %v\n", e, err)
 			failed = append(failed, struct {
 				err error
 				ex  *experiment
@@ -488,7 +510,7 @@ func (e *Evaluator) RunAll(dataDir, version, commit, timestamp, addr, port strin
 		}
 		err = e.Run()
 		if err != nil {
-			log.Printf("failed run experiment, queuing for retry: %v, %v\n", e, err)
+			log.Printf("failed run experiment: %v, %v\n", e, err)
 			failed = append(failed, struct {
 				err error
 				ex  *experiment

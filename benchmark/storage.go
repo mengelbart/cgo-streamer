@@ -30,6 +30,7 @@ const (
 )
 
 type document struct {
+	ID                string        `json:"id"`
 	Filename          string        `json:"filename" firestore:"filename"`
 	Bandwidth         int64         `json:"bandwidth" firestore:"bandwidth"`
 	CongestionControl string        `json:"congestion_control" firestore:"congestion_control"`
@@ -105,6 +106,7 @@ func (u *uploader) Upload(path string) error {
 		return err
 	}
 	d := &document{
+		ID:                       e.ID,
 		Filename:                 e.BaseFile,
 		Bandwidth:                int64(e.Bandwidth),
 		CongestionControl:        e.CongestionControl,

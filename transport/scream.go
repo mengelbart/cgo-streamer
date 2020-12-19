@@ -61,7 +61,7 @@ func (s *ScreamSendWriter) Write(b []byte) (int, error) {
 }
 
 func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(20 * time.Millisecond)
 	var lastBitrate uint
 	screamLogger := log.New(s.screamLogWriter, "", 0)
 	start := time.Now()
@@ -73,6 +73,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 			statSlice := strings.Split(stats, ",")
 			screamLogger.Printf("%v %v %v %v %v %v %v %v", time.Since(start).Milliseconds(), s.q.Len(), statSlice[4], statSlice[5], statSlice[7], statSlice[8], statSlice[9], statSlice[11])
 			kbps := s.screamTx.GetTargetBitrate(s.ssrc) / 1000
+			log.Printf("got scream bitrate: %v\n", kbps)
 			if kbps <= 0 {
 				log.Printf("skipping setBitrate to %v\n", kbps)
 				if s.requestKeyFrame != nil {

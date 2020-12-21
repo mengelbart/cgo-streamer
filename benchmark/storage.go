@@ -240,8 +240,8 @@ func getQLOGConverter(prefix string) converterFunc {
 		if err != nil {
 			return nil, err
 		}
-		var qlogData qlog.QLOGFile
-		err = json.Unmarshal(bs, &qlogData)
+		var qlogData qlog.QLOGFileNDJSON
+		err = qlogData.UnmarshalNDJSON(bs)
 		if err != nil {
 			return nil, err
 		}
@@ -281,49 +281,47 @@ func getQLOGConverter(prefix string) converterFunc {
 		discretePacketReceived := map[float64]*Row{}
 		var discretePacketReceivedKeys []float64
 
-		for _, t := range qlogData.Traces {
-			for _, r := range t.Events.Events {
-				switch r.Name {
-				case "transport:packet_sent":
-					s := math.Floor(r.RelativeTime / 1000)
-					if v, ok := discretePacketSent[s]; ok {
-						v.C[1].V += float64(r.Data.PacketSent.Header.PacketSize)
-						v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
-					} else {
-						discretePacketSentKeys = append(discretePacketSentKeys, s)
-						x := float64(r.Data.PacketSent.Header.PacketSize)
-						v = &Row{[]Cell{
-							{
-								V: s,
-								F: fmt.Sprintf("%v", s),
-							},
-							{
-								V: x,
-								F: fmt.Sprintf("%v", x),
-							},
-						}}
-						discretePacketSent[s] = v
-					}
-				case "transport:packet_received":
-					s := math.Floor(r.RelativeTime / 1000)
-					if v, ok := discretePacketReceived[s]; ok {
-						v.C[1].V += float64(r.Data.PacketReceived.Header.PacketSize)
-						v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
-					} else {
-						discretePacketReceivedKeys = append(discretePacketReceivedKeys, s)
-						x := float64(r.Data.PacketReceived.Header.PacketSize)
-						v = &Row{[]Cell{
-							{
-								V: s,
-								F: fmt.Sprintf("%v", s),
-							},
-							{
-								V: x,
-								F: fmt.Sprintf("%v", x),
-							},
-						}}
-						discretePacketReceived[s] = v
-					}
+		for _, r := range qlogData.Trace.Events.Events {
+			switch r.Name {
+			case "transport:packet_sent":
+				s := math.Floor(r.RelativeTime / 1000)
+				if v, ok := discretePacketSent[s]; ok {
+					v.C[1].V += float64(r.Data.PacketSent.Header.PacketSize)
+					v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
+				} else {
+					discretePacketSentKeys = append(discretePacketSentKeys, s)
+					x := float64(r.Data.PacketSent.Header.PacketSize)
+					v = &Row{[]Cell{
+						{
+							V: s,
+							F: fmt.Sprintf("%v", s),
+						},
+						{
+							V: x,
+							F: fmt.Sprintf("%v", x),
+						},
+					}}
+					discretePacketSent[s] = v
+				}
+			case "transport:packet_received":
+				s := math.Floor(r.RelativeTime / 1000)
+				if v, ok := discretePacketReceived[s]; ok {
+					v.C[1].V += float64(r.Data.PacketReceived.Header.PacketSize)
+					v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
+				} else {
+					discretePacketReceivedKeys = append(discretePacketReceivedKeys, s)
+					x := float64(r.Data.PacketReceived.Header.PacketSize)
+					v = &Row{[]Cell{
+						{
+							V: s,
+							F: fmt.Sprintf("%v", s),
+						},
+						{
+							V: x,
+							F: fmt.Sprintf("%v", x),
+						},
+					}}
+					discretePacketReceived[s] = v
 				}
 			}
 		}

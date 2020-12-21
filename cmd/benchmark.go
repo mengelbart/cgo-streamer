@@ -46,7 +46,6 @@ var bandwidths = []benchmark.Bitrate{
 	3 * benchmark.MBitPerSecond,
 	5 * benchmark.MBitPerSecond,
 	10 * benchmark.MBitPerSecond,
-	50 * benchmark.MBitPerSecond,
 }
 var congestionControllers = []string{
 	"none",

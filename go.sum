@@ -126,7 +126,7 @@ github.com/lunixbochs/vtclean v1.0.0/go.mod h1:pHhQNgMf3btfWnGBVipUOjRYhoOsdGqdm
 github.com/magiconair/properties v1.8.0 h1:LLgXmsheXeRoUOBOjtwPQCWIYqM/LU1ayDtDePerRcY=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/mailru/easyjson v0.0.0-20190312143242-1de009706dbe/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
-github.com/marten-seemann/qpack v0.2.0/go.mod h1:F7Gl5L1jIgN1D11ucXefiuJS9UMVP2opoCp2jDKb7wc=
+github.com/marten-seemann/qpack v0.2.1/go.mod h1:F7Gl5L1jIgN1D11ucXefiuJS9UMVP2opoCp2jDKb7wc=
 github.com/marten-seemann/qtls v0.10.0 h1:ECsuYUKalRL240rRD4Ri33ISb7kAQ3qGDlrrl55b2pc=
 github.com/marten-seemann/qtls v0.10.0/go.mod h1:UvMd1oaYDACI99/oZUYLzMCkBXQVT0aGm99sJhbT8hs=
 github.com/marten-seemann/qtls-go1-15 v0.1.1 h1:LIH6K34bPVttyXnUWixk0bzH6/N07VxbSabxn5A5gZQ=
@@ -134,8 +134,8 @@ github.com/marten-seemann/qtls-go1-15 v0.1.1/go.mod h1:GyFwywLKkRt+6mfU99csTEY1j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mengelbart/qlog v0.0.0-20201221112114-e416d02dd130 h1:cigEmXGr3u/GAuwwOe+0DIbXuSFchbP/hxjhJHKUsuI=
 github.com/mengelbart/qlog v0.0.0-20201221112114-e416d02dd130/go.mod h1:PhYcxrprkgv8kO5kbxKhrkrsopz0pFBSLjSu1hnyR90=
-github.com/mengelbart/quic-go v0.7.1-0.20201107094608-fd5504eeef3c h1:rFcBRYq4Xwf9C/Sx9ivqexT1UhlRURhsZh84F9lrlCo=
-github.com/mengelbart/quic-go v0.7.1-0.20201107094608-fd5504eeef3c/go.mod h1:CxWHmRZdj+y4bsJBPCPWdpJW5VLLF2qqESpjfftnjNk=
+github.com/mengelbart/quic-go v0.7.1-0.20201221160904-b5705e0bd436 h1:B7vd+ciZ480Bd6OV9CQNdSxraZA1ajAoMYnsNw2IjtE=
+github.com/mengelbart/quic-go v0.7.1-0.20201221160904-b5705e0bd436/go.mod h1:+/LX1EwjumQ/Lgw+ifgkVr3qA6cACHgCTwYFPsEjMJY=
 github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775 h1:MFD2xlS+KKbYi9MlLejf9WLNJ5GpVjEkDqa0mHcsccg=
 github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775/go.mod h1:Yre6kUFLW62SKaIjBBZF/E93fEBqcCqn6bZyrjljd5k=
 github.com/microcosm-cc/bluemonday v1.0.1/go.mod h1:hsXNsILzKxV+sX77C5b8FSuKF00vh2OMYv+xgHpAMF4=

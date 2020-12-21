@@ -14,4 +14,4 @@ require (
 	gonum.org/v1/gonum v0.8.1
 )
 
-replace github.com/lucas-clemente/quic-go => github.com/mengelbart/quic-go v0.7.1-0.20201107094608-fd5504eeef3c
+replace github.com/lucas-clemente/quic-go => github.com/mengelbart/quic-go v0.7.1-0.20201221160904-b5705e0bd436

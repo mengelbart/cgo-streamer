@@ -16,8 +16,6 @@ import (
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/lucas-clemente/quic-go/qlog"
 
-	"github.com/lucas-clemente/quic-go/quictrace"
-
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -64,12 +62,6 @@ func NewQUICServer(addr string, tlsc *tls.Config, options ...func(*QUICServer)) 
 		s.SessionHandler = defaultSessionHandler("No handler defined on this server, closing")
 	}
 	return s, nil
-}
-
-func SetQuicTracer(t quictrace.Tracer) func(*QUICServer) {
-	return func(s *QUICServer) {
-		s.quicConfig.QuicTracer = t
-	}
 }
 
 func EnableQLOG(filename string) func(server *QUICServer) {

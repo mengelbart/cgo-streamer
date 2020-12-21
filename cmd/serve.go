@@ -10,11 +10,8 @@ import (
 	"github.com/mengelbart/cgo-streamer/gst"
 	"github.com/mengelbart/cgo-streamer/transport"
 
-	"github.com/lucas-clemente/quic-go/quictrace"
 	"github.com/spf13/cobra"
 )
-
-var tracer quictrace.Tracer
 
 var VideoSrc string
 var Bitrate int

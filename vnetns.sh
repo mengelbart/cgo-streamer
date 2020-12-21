@@ -43,6 +43,8 @@ down() {
 	ip netns del ns1
 	ip netns del ns2
 
+  ip link delete br-veth1
+  ip link delete br-veth2
 	ip link del br1
 }
 

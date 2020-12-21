@@ -12,11 +12,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mengelbart/qlog"
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/storage"
@@ -220,10 +222,125 @@ func (c converterFunc) convert(path string) (map[string]*DataTable, error) {
 }
 
 var converterMap = map[string]converterFunc{
-	"ssim.log":   getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
-	"psnr.log":   getImageMetricConverter(0, 5, "PSNR", parseAndBound),
-	"rtcp.log":   rtcpConverter,
-	"scream.log": screamConverter,
+	"ssim.log":    getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
+	"psnr.log":    getImageMetricConverter(0, 5, "PSNR", parseAndBound),
+	"rtcp.log":    rtcpConverter,
+	"scream.log":  screamConverter,
+	"server.qlog": getQLOGConverter("server"),
+	"client.qlog": getQLOGConverter("client"),
+}
+
+func getQLOGConverter(prefix string) converterFunc {
+	return func(path string) (map[string]*DataTable, error) {
+		qlogFile, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		bs, err := ioutil.ReadAll(qlogFile)
+		if err != nil {
+			return nil, err
+		}
+		var qlogData qlog.QLOGFile
+		err = json.Unmarshal(bs, &qlogData)
+		if err != nil {
+			return nil, err
+		}
+		packetSent := &DataTable{
+			Cols: []Col{
+				{
+					T:     "number",
+					ID:    "col_1",
+					Label: "n",
+				},
+				{
+					T:     "number",
+					ID:    "col_2",
+					Label: fmt.Sprintf("%v-packet_sent_bytes", prefix),
+				},
+			},
+			Rows: []Row{},
+		}
+		discretePacketSent := map[float64]*Row{}
+		var discretePacketSentKeys []float64
+
+		packetReceived := &DataTable{
+			Cols: []Col{
+				{
+					T:     "number",
+					ID:    "col_1",
+					Label: "n",
+				},
+				{
+					T:     "number",
+					ID:    "col_2",
+					Label: fmt.Sprintf("%v-packet_received_bytes", prefix),
+				},
+			},
+			Rows: []Row{},
+		}
+		discretePacketReceived := map[float64]*Row{}
+		var discretePacketReceivedKeys []float64
+
+		for _, t := range qlogData.Traces {
+			for _, r := range t.Events.Events {
+				switch r.Name {
+				case "transport:packet_sent":
+					s := math.Floor(r.RelativeTime / 1000)
+					if v, ok := discretePacketSent[s]; ok {
+						v.C[1].V += float64(r.Data.PacketSent.Header.PacketSize)
+						v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
+					} else {
+						discretePacketSentKeys = append(discretePacketSentKeys, s)
+						x := float64(r.Data.PacketSent.Header.PacketSize)
+						v = &Row{[]Cell{
+							{
+								V: s,
+								F: fmt.Sprintf("%v", s),
+							},
+							{
+								V: x,
+								F: fmt.Sprintf("%v", x),
+							},
+						}}
+						discretePacketSent[s] = v
+					}
+				case "transport:packet_received":
+					s := math.Floor(r.RelativeTime / 1000)
+					if v, ok := discretePacketReceived[s]; ok {
+						v.C[1].V += float64(r.Data.PacketReceived.Header.PacketSize)
+						v.C[1].F = fmt.Sprintf("%v", v.C[1].V)
+					} else {
+						discretePacketReceivedKeys = append(discretePacketReceivedKeys, s)
+						x := float64(r.Data.PacketReceived.Header.PacketSize)
+						v = &Row{[]Cell{
+							{
+								V: s,
+								F: fmt.Sprintf("%v", s),
+							},
+							{
+								V: x,
+								F: fmt.Sprintf("%v", x),
+							},
+						}}
+						discretePacketReceived[s] = v
+					}
+				}
+			}
+		}
+		sort.Float64s(discretePacketSentKeys)
+		for _, v := range discretePacketSentKeys {
+			packetSent.Rows = append(packetSent.Rows, *discretePacketSent[v])
+		}
+
+		sort.Float64s(discretePacketReceivedKeys)
+		for _, v := range discretePacketReceivedKeys {
+			packetReceived.Rows = append(packetReceived.Rows, *discretePacketReceived[v])
+		}
+		return map[string]*DataTable{
+			fmt.Sprintf("%v_packet_sent", prefix):     packetSent,
+			fmt.Sprintf("%v_packet_received", prefix): packetReceived,
+		}, qlogFile.Close()
+	}
 }
 
 func getImageMetricConverter(first, second int, label string, parseFloat func(string, int) (float64, error)) converterFunc {

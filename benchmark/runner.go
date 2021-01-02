@@ -346,7 +346,7 @@ func setBandwidth(b Bitrate) error {
 	var err error
 	for i := 1; i <= 2; i++ {
 		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "add", "dev", fmt.Sprintf("veth%v", i), "root", "tbf", "rate", fmt.Sprintf("%v", b), "limit", "100kB", "burst", "100kB")
-		fmt.Printf("%v %v", tc.Path, tc.Args)
+		fmt.Printf("%v %v\n", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
 		tc.Stderr = os.Stderr
 		err1 := tc.Run()
@@ -362,7 +362,7 @@ func deleteBandwidthLimit() error {
 	var err error
 	for i := 1; i <= 2; i++ {
 		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "delete", "dev", fmt.Sprintf("veth%v", i), "root")
-		fmt.Printf("%v %v", tc.Path, tc.Args)
+		fmt.Printf("%v %v\n", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
 		tc.Stderr = os.Stderr
 		err1 := tc.Run()

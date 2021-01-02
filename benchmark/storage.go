@@ -67,6 +67,16 @@ func NewUploader(prefix string) (*uploader, error) {
 		return nil, err
 	}
 
+	experimentsIndexEntry := struct {
+		Commit string `json:"commit"`
+	}{
+		Commit: prefix,
+	}
+	_, _, err = fs.Collection(experimentCollection).Add(context.Background(), experimentsIndexEntry)
+	if err != nil {
+		return nil, err
+	}
+
 	s, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, err

@@ -312,7 +312,7 @@ func (e *experiment) Run() error {
 		iperf3Server.Stdout = os.Stdout
 		iperf3Server.Stderr = os.Stderr
 
-		cancel := time.AfterFunc(15*time.Second, func() {
+		cancel := time.AfterFunc(2*time.Minute, func() {
 			iperf3Client := exec.Command(
 				"ip",
 				"netns",
@@ -328,7 +328,7 @@ func (e *experiment) Run() error {
 				"iperf3client.log",
 				"-J",
 				"-t",
-				"15",
+				"60",
 			)
 			iperf3Client.Stdout = os.Stdout
 			iperf3Client.Stderr = os.Stderr

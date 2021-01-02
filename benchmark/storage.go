@@ -150,7 +150,7 @@ func (u *uploader) Upload(path string) error {
 			d.Data[name] = link
 		}
 	}
-	_, _, err = u.f.Collection(fmt.Sprintf("%v/%v", experimentCollection, u.prefix)).Add(context.Background(), d)
+	_, _, err = u.f.Collection(fmt.Sprintf("%v/%v/%v", experimentCollection, u.prefix, "runs")).Add(context.Background(), d)
 	return err
 }
 

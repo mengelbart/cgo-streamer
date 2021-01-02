@@ -260,6 +260,8 @@ func (e *experiment) Run() error {
 		return err
 	}
 
+	time.Sleep(2 * time.Second)
+
 	err = e.stream.Start()
 	if err != nil {
 		fmt.Printf("could not start stream client: %v\n", err)
@@ -324,7 +326,7 @@ func (e *experiment) Run() error {
 		done <- e.stream.Wait()
 	}()
 	select {
-	case <-time.After(3 * time.Minute):
+	case <-time.After(5 * time.Minute):
 		if err := e.stream.Process.Kill(); err != nil {
 			log.Printf("could not kill process: %v\n", err)
 			return err
@@ -343,7 +345,8 @@ func (e *experiment) Run() error {
 func setBandwidth(b Bitrate) error {
 	var err error
 	for i := 1; i <= 2; i++ {
-		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "add", "dev", fmt.Sprintf("veth%v", i), "root", "netem", "rate", fmt.Sprintf("%v", b))
+		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "add", "dev", fmt.Sprintf("veth%v", i), "root", "tbf", "rate", fmt.Sprintf("%v", b), "limit", "100kB", "burst", "100kB")
+		fmt.Printf("%v %v", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
 		tc.Stderr = os.Stderr
 		err1 := tc.Run()
@@ -359,6 +362,7 @@ func deleteBandwidthLimit() error {
 	var err error
 	for i := 1; i <= 2; i++ {
 		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "delete", "dev", fmt.Sprintf("veth%v", i), "root")
+		fmt.Printf("%v %v", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
 		tc.Stderr = os.Stderr
 		err1 := tc.Run()

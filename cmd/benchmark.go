@@ -43,9 +43,11 @@ Linux network namespaces which can be configured with the
 var bandwidths = []benchmark.Bitrate{
 	0,
 	1 * benchmark.MBitPerSecond,
+	2 * benchmark.MBitPerSecond,
 	3 * benchmark.MBitPerSecond,
+	4 * benchmark.MBitPerSecond,
 	5 * benchmark.MBitPerSecond,
-	10 * benchmark.MBitPerSecond,
+	6 * benchmark.MBitPerSecond,
 }
 var congestionControllers = []string{
 	"none",
@@ -57,7 +59,6 @@ var handlers = []string{
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
-	1 * time.Millisecond,
 	10 * time.Millisecond,
 	40 * time.Millisecond,
 	100 * time.Millisecond,

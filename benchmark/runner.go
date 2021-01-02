@@ -76,6 +76,31 @@ func (e experiment) String() string {
 	return name
 }
 
+func (e experiment) serveIperf() []string {
+	cmd := []string{
+		"-s",
+		"-p",
+		"3000",
+	}
+	return cmd
+}
+
+func (e experiment) clientIperf() []string {
+	cmd := []string{
+		"-c",
+		fmt.Sprintf("%v", e.addr),
+		"-p",
+		"3000",
+		"-u",
+		"-b",
+		"100mbit",
+		"-R",
+		"-t",
+		"30",
+	}
+	return cmd
+}
+
 func (e experiment) serveCmd() []string {
 	cmd := []string{
 		"serve",
@@ -152,6 +177,7 @@ func (e *experiment) setup(binary string) error {
 	}
 	e.files = append(e.files, serveLogFile)
 	e.serve = exec.Command("ip", append([]string{"netns", "exec", "ns1", binary}, e.serveCmd()...)...)
+	//e.serve = exec.Command("ip", append([]string{"netns", "exec", "ns1", "iperf3"}, e.serveIperf()...)...)
 	e.serve.Stdout = serveLogFile
 	e.serve.Stderr = serveLogFile
 	e.ServeCMD = strings.Join(append([]string{e.serve.Path}, e.serve.Args...), " ")
@@ -163,6 +189,7 @@ func (e *experiment) setup(binary string) error {
 	}
 	e.files = append(e.files, clientLogFile)
 	e.stream = exec.Command("ip", append([]string{"netns", "exec", "ns2", binary}, e.clientCmd()...)...)
+	//e.stream = exec.Command("ip", append([]string{"netns", "exec", "ns2", "iperf3"}, e.clientIperf()...)...)
 	e.stream.Stdout = clientLogFile
 	e.stream.Stderr = clientLogFile
 	e.StreamCMD = strings.Join(append([]string{e.stream.Path}, e.stream.Args...), " ")

@@ -59,9 +59,10 @@ var handlers = []string{
 	"datagram",
 }
 var feedbackFrequencies = []time.Duration{
+	1 * time.Millisecond,
 	10 * time.Millisecond,
-	40 * time.Millisecond,
-	100 * time.Millisecond,
+	20 * time.Millisecond,
+	30 * time.Millisecond,
 }
 
 func runBenchmark() error {

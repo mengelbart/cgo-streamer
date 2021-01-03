@@ -308,7 +308,6 @@ func (e *experiment) Run() error {
 			"--logfile",
 			"iperf3server.log",
 			"-J",
-			"-R",
 		)
 		iperf3Server.Stdout = os.Stdout
 		iperf3Server.Stderr = os.Stderr
@@ -330,6 +329,7 @@ func (e *experiment) Run() error {
 				"-J",
 				"-t",
 				"60",
+				"-R",
 			)
 			iperf3Client.Stdout = os.Stdout
 			iperf3Client.Stderr = os.Stderr

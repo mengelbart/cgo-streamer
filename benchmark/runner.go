@@ -40,7 +40,11 @@ type experiment struct {
 
 	serve  *exec.Cmd
 	stream *exec.Cmd
-	files  []*os.File
+
+	serverVnstat *exec.Cmd
+	clientVnstat *exec.Cmd
+
+	files []*os.File
 
 	Version                  string `json:"version"`
 	Commit                   string `json:"commit"`
@@ -194,6 +198,27 @@ func (e *experiment) setup(binary string) error {
 	e.stream.Stderr = clientLogFile
 	e.StreamCMD = strings.Join(append([]string{e.stream.Path}, e.stream.Args...), " ")
 
+	// setup vnstat commands
+	serverVnstatLogFile, err := os.Create("server_vnstat.json")
+	if err != nil {
+		fmt.Printf("could not touch server vnstat log file: %v", err)
+		return err
+	}
+	e.files = append(e.files)
+	e.serverVnstat = exec.Command("ip", "netns", "exec", "ns1", "vnstat", "-l", "-i", "veth1", "--json")
+	e.serverVnstat.Stdout = serverVnstatLogFile
+	e.serverVnstat.Stderr = serverVnstatLogFile
+
+	clientVnstatLogFile, err := os.Create("client_vnstat.json")
+	if err != nil {
+		fmt.Printf("could not touch client vnstat log file: %v", err)
+		return err
+	}
+	e.files = append(e.files)
+	e.clientVnstat = exec.Command("ip", "netns", "exec", "ns2", "vnstat", "-l", "-i", "veth2", "--json")
+	e.clientVnstat.Stdout = clientVnstatLogFile
+	e.clientVnstat.Stderr = clientVnstatLogFile
+
 	// Write config file
 	file, err := json.MarshalIndent(e, "", "	")
 	if err != nil {
@@ -218,6 +243,15 @@ func (e *experiment) Teardown() error {
 	// stop server
 	if err := e.serve.Process.Kill(); err != nil {
 		fmt.Printf("could not kill serve cmd: %v\n", err)
+		return err
+	}
+
+	if err := e.serverVnstat.Process.Kill(); err != nil {
+		fmt.Printf("could not kill server vnstat cmd: %v\n", err)
+		return err
+	}
+	if err := e.clientVnstat.Process.Kill(); err != nil {
+		fmt.Printf("could not kill client vnstat cmd: %v\n", err)
 		return err
 	}
 
@@ -288,6 +322,15 @@ func (e *experiment) Run() error {
 	}
 
 	time.Sleep(2 * time.Second)
+
+	if err = e.clientVnstat.Start(); err != nil {
+		fmt.Printf("could not start client vnstat: %v\n", err)
+		return err
+	}
+	if err = e.serverVnstat.Start(); err != nil {
+		fmt.Printf("could not start server vnstat: %v\n", err)
+		return err
+	}
 
 	err = e.stream.Start()
 	if err != nil {

@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/csv"
@@ -232,12 +233,105 @@ func (c converterFunc) convert(path string) (map[string]*DataTable, error) {
 }
 
 var converterMap = map[string]converterFunc{
-	"ssim.log":    getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
-	"psnr.log":    getImageMetricConverter(0, 5, "PSNR", parseAndBound),
-	"rtcp.log":    rtcpConverter,
-	"scream.log":  screamConverter,
-	"server.qlog": getQLOGConverter("server"),
-	"client.qlog": getQLOGConverter("client"),
+	"ssim.log":           getImageMetricConverter(0, 4, "SSIM", strconv.ParseFloat),
+	"psnr.log":           getImageMetricConverter(0, 5, "PSNR", parseAndBound),
+	"rtcp.log":           rtcpConverter,
+	"scream.log":         screamConverter,
+	"server.qlog":        getQLOGConverter("server"),
+	"client.qlog":        getQLOGConverter("client"),
+	"server_vnstat.json": getVnstatConverter("server"),
+	"client_vnstat.json": getVnstatConverter("client"),
+}
+
+func getVnstatConverter(prefix string) converterFunc {
+	return func(path string) (map[string]*DataTable, error) {
+		vnstatFile, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer vnstatFile.Close()
+
+		rxBytes := &DataTable{
+			Cols: []Col{
+				{
+					T:     "number",
+					ID:    "col_1",
+					Label: "n",
+				},
+				{
+					T:     "number",
+					ID:    "col_2",
+					Label: fmt.Sprintf("%v RX Bytes", prefix),
+				},
+			},
+			Rows: []Row{},
+		}
+		txBytes := &DataTable{
+			Cols: []Col{
+				{
+					T:     "number",
+					ID:    "col_1",
+					Label: "n",
+				},
+				{
+					T:     "number",
+					ID:    "col_2",
+					Label: fmt.Sprintf("%v TX Bytes", prefix),
+				},
+			},
+			Rows: []Row{},
+		}
+
+		type x struct {
+			BytesPerSecond int `json:"bytespersecond"`
+		}
+		type entry struct {
+			Index   int `json:"index"`
+			Seconds int `json:"seconds"`
+			RX      *x  `json:"rx"`
+			TX      *x  `json:"tx"`
+		}
+
+		scanner := bufio.NewScanner(vnstatFile)
+		for scanner.Scan() {
+			bs := scanner.Bytes()
+			var e entry
+			err := json.Unmarshal(bs, &e)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			if e.RX != nil {
+				rxBytes.Rows = append(rxBytes.Rows, Row{[]Cell{
+					{
+						V: float64(e.Seconds),
+						F: fmt.Sprintf("%v", e.Seconds),
+					},
+					{
+						V: float64(e.RX.BytesPerSecond),
+						F: fmt.Sprintf("%v", e.RX.BytesPerSecond),
+					},
+				}})
+			}
+			if e.TX != nil {
+				txBytes.Rows = append(txBytes.Rows, Row{[]Cell{
+					{
+						V: float64(e.Seconds),
+						F: fmt.Sprintf("%v", e.Seconds),
+					},
+					{
+						V: float64(e.TX.BytesPerSecond),
+						F: fmt.Sprintf("%v", e.TX.BytesPerSecond),
+					},
+				}})
+			}
+		}
+
+		return map[string]*DataTable{
+			fmt.Sprintf("%v_rx_bytes", prefix): rxBytes,
+			fmt.Sprintf("%v_tx_bytes", prefix): txBytes,
+		}, nil
+	}
 }
 
 func getQLOGConverter(prefix string) converterFunc {

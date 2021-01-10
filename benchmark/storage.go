@@ -582,17 +582,33 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 		},
 		Rows: []Row{},
 	}
+	rtt := &DataTable{
+		Cols: []Col{
+			{
+				T:     "numner",
+				ID:    "col_1",
+				Label: "time",
+			},
+			{
+				T:     "number",
+				ID:    "col_2",
+				Label: "SCReAM RTT",
+			},
+		},
+		Rows: []Row{},
+	}
 
 	// 'time', 'queueLen', 'cwnd', 'bytesInFlight', 'fastStart', 'queueDelay', 'targetBitrate', 'rateTransmitted'
 	// 200		7			3525	1981				1			0.000		2048				0
 	time := 0
 	queueLen := 1
-	cwnd := 2
-	bytesInFlight := 3
-	//fastStart := 4
-	//queueDelay := 5
-	targetBitrate := 6
-	rateTransmitted := 7
+	rttPos := 2
+	cwnd := 3
+	bytesInFlight := 4
+	//fastStart := 5
+	//queueDelay := 6
+	targetBitrate := 7
+	rateTransmitted := 8
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
@@ -606,6 +622,10 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 			return nil, err
 		}
 		q, err := strconv.ParseFloat(record[queueLen], 64)
+		if err != nil {
+			return nil, err
+		}
+		r, err := strconv.ParseFloat(record[rttPos], 64)
 		if err != nil {
 			return nil, err
 		}
@@ -663,11 +683,22 @@ func screamConverter(path string) (map[string]*DataTable, error) {
 				F: record[queueLen],
 			},
 		}})
+		rtt.Rows = append(rtt.Rows, Row{[]Cell{
+			{
+				V: t,
+				F: record[time],
+			},
+			{
+				V: r,
+				F: record[rttPos],
+			},
+		}})
 	}
 	return map[string]*DataTable{
 		"scream-congestion":   congestion,
 		"scream-bitrate":      bitrate,
 		"scream-queue-length": queueLength,
+		"scream-rtt":          rtt,
 	}, csvFile.Close()
 }
 

@@ -298,7 +298,7 @@ func getVnstatConverter(prefix string) converterFunc {
 			var e entry
 			err := json.Unmarshal(bs, &e)
 			if err != nil {
-				log.Println(err)
+				log.Printf("skipping vnstat line: %v\n", err)
 				continue
 			}
 			if e.RX != nil {

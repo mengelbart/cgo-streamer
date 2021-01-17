@@ -8,12 +8,14 @@ import (
 )
 
 type DatagramHandler struct {
-	src SrcFactory
+	src    SrcFactory
+	tracer *QUICTracer
 }
 
-func NewDatagramHandler(src SrcFactory) *DatagramHandler {
+func NewDatagramHandler(src SrcFactory, tracer *QUICTracer) *DatagramHandler {
 	return &DatagramHandler{
-		src: src,
+		src:    src,
+		tracer: tracer,
 	}
 }
 
@@ -26,9 +28,9 @@ func (d *DatagramHandler) handle(session quic.Session) error {
 		feedbackErr: make(chan error, 1),
 	}
 
-	go ds.AcceptFeedback(ds.feedback)
+	go ds.AcceptFeedback()
 
-	cancel := d.src.MakeSrc(ds, ds.feedback)
+	cancel := d.src.MakeSrc(ds, ds.feedback, d.tracer.getACKChan())
 	defer cancel()
 
 	var err error
@@ -56,13 +58,13 @@ type DatagramSession struct {
 	feedbackErr chan error
 }
 
-func (d *DatagramSession) AcceptFeedback(fbChan chan<- []byte) {
+func (d *DatagramSession) AcceptFeedback() {
 	for {
 		msg, err := d.sess.ReceiveMessage()
 		if err != nil {
 			d.feedbackErr <- err
 		}
-		fbChan <- msg
+		d.feedback <- msg
 	}
 }
 

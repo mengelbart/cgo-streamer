@@ -1,11 +1,16 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/mengelbart/cgo-streamer/util"
+
+	"github.com/lucas-clemente/quic-go/logging"
 
 	"github.com/mengelbart/cgo-streamer/gst"
 	"github.com/mengelbart/cgo-streamer/transport"
@@ -66,8 +71,22 @@ func serve() error {
 
 	var runner Runner
 	var options []func(*transport.QUICServer)
+	var tracer *transport.QUICTracer
 	if len(QLOGFile) > 0 {
-		options = append(options, transport.EnableQLOG(QLOGFile))
+		tracer = transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+			f, err := os.Create(QLOGFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("Creating qlog file %s.\n", QLOGFile)
+			return util.NewBufferedWriteCloser(bufio.NewWriter(f), f)
+		})
+		options = append(options, transport.SetQLOGTracer(tracer))
+	} else {
+		tracer = transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+			return nopCloser{}
+		})
+		options = append(options, transport.SetQLOGTracer(tracer))
 	}
 	switch Handler {
 	case "udp":
@@ -80,7 +99,7 @@ func serve() error {
 		}
 		runner = s
 	case "datagram":
-		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src)))
+		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src, tracer)))
 		options = append(options, transport.SetDatagramEnabled(true))
 		fallthrough
 	default:
@@ -102,9 +121,9 @@ type Src struct {
 	bitrate          int
 }
 
-func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
+func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte, ack <-chan []*transport.Packet) func() {
 	if s.scream {
-		return s.MakeScreamSrc(w, fb)
+		return s.MakeScreamSrc(w, fb, ack)
 	}
 	return s.MakeSimpleSrc(w, fb)
 }
@@ -127,9 +146,9 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	}
 }
 
-func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
+func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte, ack <-chan []*transport.Packet) func() {
 	ssrc := uint(1)
-	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, s.ScreamLogWriter)
+	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, ack, s.ScreamLogWriter)
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
@@ -137,11 +156,21 @@ func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 		cc.SetKeyFrameRequester(p.ForceKeyFrame)
 	}
 	p.Start()
-	go cc.Run()
+	go cc.Run2()
 	go cc.RunBitrate(p.SetBitRate)
 
 	return func() {
 		p.Stop()
 		p.Destroy()
 	}
+}
+
+type nopCloser struct{}
+
+func (n2 nopCloser) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
+
+func (n2 nopCloser) Close() error {
+	return nil
 }

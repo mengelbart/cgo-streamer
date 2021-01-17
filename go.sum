@@ -131,10 +131,10 @@ github.com/marten-seemann/qtls-go1-15 v0.1.1/go.mod h1:GyFwywLKkRt+6mfU99csTEY1j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mengelbart/qlog v0.0.0-20201221214436-d5660195a918 h1:rhsym6ZZX+rPJNUPOEsqicq1b/kNp8INurFtpO3lE9s=
 github.com/mengelbart/qlog v0.0.0-20201221214436-d5660195a918/go.mod h1:PhYcxrprkgv8kO5kbxKhrkrsopz0pFBSLjSu1hnyR90=
-github.com/mengelbart/quic-go v0.7.1-0.20201222090311-dac498ae6f61 h1:BRg6hHaiWBl6s99PPM5+XSWEiXQpqJaEQO1L5sviun4=
-github.com/mengelbart/quic-go v0.7.1-0.20201222090311-dac498ae6f61/go.mod h1:+/LX1EwjumQ/Lgw+ifgkVr3qA6cACHgCTwYFPsEjMJY=
-github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775 h1:MFD2xlS+KKbYi9MlLejf9WLNJ5GpVjEkDqa0mHcsccg=
-github.com/mengelbart/scream-go v0.0.0-20201116111338-be6d0928b775/go.mod h1:Yre6kUFLW62SKaIjBBZF/E93fEBqcCqn6bZyrjljd5k=
+github.com/mengelbart/quic-go v0.7.1-0.20210118112700-9cf8c8d24c2b h1:KSuxtizkCT77VFo+CgyzWIS2HoZm85sr3hGQsTNN9ns=
+github.com/mengelbart/quic-go v0.7.1-0.20210118112700-9cf8c8d24c2b/go.mod h1:+/LX1EwjumQ/Lgw+ifgkVr3qA6cACHgCTwYFPsEjMJY=
+github.com/mengelbart/scream-go v0.0.0-20210204094003-2241b22d88be h1:FV7DeE0BttGmqUriPsFXAfR0pPgf/9DtJzxXczQVAkE=
+github.com/mengelbart/scream-go v0.0.0-20210204094003-2241b22d88be/go.mod h1:Yre6kUFLW62SKaIjBBZF/E93fEBqcCqn6bZyrjljd5k=
 github.com/microcosm-cc/bluemonday v1.0.1/go.mod h1:hsXNsILzKxV+sX77C5b8FSuKF00vh2OMYv+xgHpAMF4=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=

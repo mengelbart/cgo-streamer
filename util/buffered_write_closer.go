@@ -1,24 +1,24 @@
-package transport
+package util
 
 import (
 	"bufio"
 	"io"
 )
 
-type bufferedWriteCloser struct {
+type BufferedWriteCloser struct {
 	*bufio.Writer
 	io.Closer
 }
 
 // NewBufferedWriteCloser creates an io.WriteCloser from a bufio.Writer and an io.Closer
-func newBufferedWriteCloser(writer *bufio.Writer, closer io.Closer) io.WriteCloser {
-	return &bufferedWriteCloser{
+func NewBufferedWriteCloser(writer *bufio.Writer, closer io.Closer) io.WriteCloser {
+	return &BufferedWriteCloser{
 		Writer: writer,
 		Closer: closer,
 	}
 }
 
-func (h bufferedWriteCloser) Close() error {
+func (h BufferedWriteCloser) Close() error {
 	if err := h.Writer.Flush(); err != nil {
 		return err
 	}

@@ -11,6 +11,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/mengelbart/cgo-streamer/util"
+
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/lucas-clemente/quic-go/qlog"
 
@@ -49,7 +51,7 @@ func NewQUICClient(addr string, w io.Writer, dgram bool, qlogFile string) *QUICC
 				log.Fatal(err)
 			}
 			log.Printf("Creating qlog file %s.\n", qlogFile)
-			return newBufferedWriteCloser(bufio.NewWriter(f), f)
+			return util.NewBufferedWriteCloser(bufio.NewWriter(f), f)
 		})
 	}
 	return qc
@@ -197,6 +199,10 @@ func (c *QUICClient) RunDgram() error {
 				return nil
 			}
 			return err
+		}
+		if len(bs) <= 2 {
+			// ack provoking packet
+			continue
 		}
 		_, err = io.Copy(c.writer, bytes.NewReader(bs))
 		if err != nil && err != io.EOF {

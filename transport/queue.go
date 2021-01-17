@@ -42,7 +42,7 @@ func (q *Queue) Clear() {
 
 func (q *Queue) SizeOfNextRTP() int {
 	if len(q.q) <= 0 {
-		return 0
+		return -1
 	}
 	return len(q.q[0].Packet.Raw)
 }

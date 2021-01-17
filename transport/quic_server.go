@@ -1,20 +1,16 @@
 package transport
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
 	"log"
 	"math/big"
-	"os"
 
 	"github.com/lucas-clemente/quic-go/logging"
-	"github.com/lucas-clemente/quic-go/qlog"
 
 	"github.com/lucas-clemente/quic-go"
 )
@@ -64,16 +60,9 @@ func NewQUICServer(addr string, tlsc *tls.Config, options ...func(*QUICServer)) 
 	return s, nil
 }
 
-func EnableQLOG(filename string) func(server *QUICServer) {
+func SetQLOGTracer(tracer logging.Tracer) func(server *QUICServer) {
 	return func(s *QUICServer) {
-		s.quicConfig.Tracer = qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
-			f, err := os.Create(filename)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Printf("Creating qlog file %s.\n", filename)
-			return newBufferedWriteCloser(bufio.NewWriter(f), f)
-		})
+		s.quicConfig.Tracer = tracer
 	}
 }
 

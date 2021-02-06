@@ -34,6 +34,7 @@ type experiment struct {
 	FeedbackFrequency time.Duration `json:"feedback_frequency"`
 	RequestKeyFrames  bool          `json:"request_key_frames"`
 	Iperf             bool          `json:"iperf"`
+	FeedbackAlgorithm int           `json:"feedback_algorithm"`
 
 	ServeCMD  string `json:"server_cmd"`
 	StreamCMD string `json:"client_cmd"`
@@ -117,6 +118,8 @@ func (e experiment) serveCmd() []string {
 		e.AbsFile,
 		"--handler",
 		e.Handler,
+		"--feedback-algorithm",
+		fmt.Sprintf("%v", e.FeedbackAlgorithm),
 	}
 
 	if e.CongestionControl == "scream" {
@@ -140,6 +143,8 @@ func (e experiment) clientCmd() []string {
 		fmt.Sprintf("streamed-%v", e.BaseFile),
 		"--handler",
 		e.Handler,
+		"--feedback-algorithm",
+		fmt.Sprintf("%v", e.FeedbackAlgorithm),
 	}
 
 	if e.CongestionControl == "scream" {
@@ -454,6 +459,7 @@ type Evaluator struct {
 	FeedbackFrequencies   []time.Duration
 	RequestKeyFrames      []bool
 	Iperf                 []bool
+	FeedbackAlgorithms    []int
 }
 
 func (e *Evaluator) buildExperiments() []*experiment {
@@ -465,6 +471,7 @@ func (e *Evaluator) buildExperiments() []*experiment {
 		len(e.Iperf),
 		len(e.FeedbackFrequencies),
 		len(e.RequestKeyFrames),
+		len(e.FeedbackAlgorithms),
 	}
 	gen := combin.NewCartesianGenerator(lens)
 	var experiments []*experiment
@@ -478,9 +485,14 @@ func (e *Evaluator) buildExperiments() []*experiment {
 			Iperf:             e.Iperf[p[4]],
 			FeedbackFrequency: e.FeedbackFrequencies[p[5]],
 			RequestKeyFrames:  e.RequestKeyFrames[p[6]],
+			FeedbackAlgorithm: e.FeedbackAlgorithms[p[7]],
 		}
 		// filter redundant none cc settings, RequestKeyFrames and FeedbackFrequency don't make sense without cc
 		if c.CongestionControl == "none" && (c.RequestKeyFrames || c.FeedbackFrequency != 1*time.Millisecond) {
+			continue
+		}
+		// filter inferred feedback for non-datagram handlers
+		if c.FeedbackAlgorithm != 0 && (c.CongestionControl != "scream" || c.Handler != "datagram") {
 			continue
 		}
 		experiments = append(experiments, c)

@@ -46,8 +46,6 @@ var bandwidths = []benchmark.Bitrate{
 	2 * benchmark.MBitPerSecond,
 	3 * benchmark.MBitPerSecond,
 	4 * benchmark.MBitPerSecond,
-	5 * benchmark.MBitPerSecond,
-	6 * benchmark.MBitPerSecond,
 }
 var congestionControllers = []string{
 	"none",
@@ -62,7 +60,11 @@ var feedbackFrequencies = []time.Duration{
 	1 * time.Millisecond,
 	10 * time.Millisecond,
 	20 * time.Millisecond,
-	30 * time.Millisecond,
+	100 * time.Millisecond,
+}
+var feedbackAlgorithms = []int{
+	0,
+	1,
 }
 
 func runBenchmark() error {
@@ -75,6 +77,7 @@ func runBenchmark() error {
 		FeedbackFrequencies:   feedbackFrequencies,
 		RequestKeyFrames:      []bool{false, true},
 		Iperf:                 []bool{false, true},
+		FeedbackAlgorithms:    feedbackAlgorithms,
 	}
 	return evaluator.RunAll(
 		dataDir,

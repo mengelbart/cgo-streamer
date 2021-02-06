@@ -23,7 +23,7 @@ func NewTracer(getLogWriter func(p logging.Perspective, connectionID []byte) io.
 	}
 }
 
-func (q *QUICTracer) getACKChan() chan []*Packet {
+func (q *QUICTracer) GetACKChan() chan []*Packet {
 	return q.ack
 }
 

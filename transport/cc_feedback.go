@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -26,38 +25,6 @@ func (c *CCFeedback) String() string {
 	}
 	s += fmt.Sprintf("Timestamp: %v\n", c.ReportTimestamp)
 	return s
-}
-
-func (c *CCFeedback) MarshalBinary() ([]byte, error) {
-	binaryHeader, err := c.Header.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.BigEndian, binaryHeader)
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Write(buf, binary.BigEndian, c.SenderSSRC)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, r := range c.Reports {
-		br, err := r.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		_, err = buf.Write(br)
-		if err != nil {
-			return nil, err
-		}
-	}
-	err = binary.Write(buf, binary.BigEndian, c.ReportTimestamp)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func (c *CCFeedback) UnmarshalBinary(data []byte) error {
@@ -100,39 +67,6 @@ func (s *SSRCReport) String() string {
 	return r
 }
 
-func (s *SSRCReport) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, s.StreamSSRC)
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Write(buf, binary.BigEndian, s.BeginSeq)
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Write(buf, binary.BigEndian, s.NumReports)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range s.Reports {
-		br, err := r.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		_, err = buf.Write(br)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if len(s.Reports)%2 != 0 {
-		_, err := buf.Write(make([]byte, 2))
-		if err != nil {
-			return nil, err
-		}
-	}
-	return buf.Bytes(), nil
-}
-
 func (s *SSRCReport) UnmarshalBinary(data []byte) error {
 	s.StreamSSRC = binary.BigEndian.Uint32(data[0:4])
 	s.BeginSeq = binary.BigEndian.Uint16(data[4:6])
@@ -153,17 +87,6 @@ type StreamReport struct {
 	L                 bool
 	ECN               byte
 	ArrivalTimeOffset uint16
-}
-
-func (s *StreamReport) MarshalBinary() (data []byte, err error) {
-	data = make([]byte, 2)
-	if s.L {
-		data[0] = 0x80 | ((s.ECN & 0x3) << 5) | byte((s.ArrivalTimeOffset>>8)&0x1F)
-	} else {
-		data[0] = 0x00 | ((s.ECN & 0x3) << 5) | byte(s.ArrivalTimeOffset&0x1F)
-	}
-	data[1] = byte(s.ArrivalTimeOffset & 0xFF)
-	return
 }
 
 func (s *StreamReport) UnmarshalBinary(data []byte) error {

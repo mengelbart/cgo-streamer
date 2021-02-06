@@ -200,10 +200,6 @@ func (c *QUICClient) RunDgram() error {
 			}
 			return err
 		}
-		if len(bs) <= 2 {
-			// ack provoking packet
-			continue
-		}
 		_, err = io.Copy(c.writer, bytes.NewReader(bs))
 		if err != nil && err != io.EOF {
 			return err

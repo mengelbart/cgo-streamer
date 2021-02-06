@@ -36,7 +36,7 @@ func (m *StreamPerFrameHandler) handle(sess quic.Session) error {
 		errChan <- err
 	}()
 
-	cancel := m.src.MakeSrc(session, session.feedback, nil) // nil: QUIC Feedback not implemented for streamperframe
+	cancel := m.src.MakeSrc(session, session.feedback) // nil: QUIC Feedback not implemented for streamperframe
 	defer cancel()
 
 	var err error

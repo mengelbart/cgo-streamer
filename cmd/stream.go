@@ -65,12 +65,16 @@ func run() error {
 			return err
 		}
 		closeChans = append(closeChans, c)
-		writer, close, err := getRTCPStatWriter(sender, RTCPLogFile)
+		writer, cancel, err := getRTCPStatWriter(sender, RTCPLogFile)
 		if err != nil {
 			return err
 		}
-		defer close()
-		go screamWriter.Run(writer)
+		defer cancel()
+		if FeedbackAlgorithm > 0 {
+			go screamWriter.RunMinimalFeedback(writer)
+		} else {
+			go screamWriter.RunFullFeedback(writer)
+		}
 	} else {
 		client = newClient(Handler, Addr, pipeline, QLOGFile)
 	}

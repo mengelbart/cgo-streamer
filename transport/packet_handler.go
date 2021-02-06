@@ -30,7 +30,7 @@ func (h *UDPPacketHandler) handle(conn net.PacketConn, addr net.Addr, buf []byte
 			addr:     addr,
 			feedback: make(chan []byte, 1024),
 		}
-		cancel := h.src.MakeSrc(ps, ps.feedback, nil) // nil: QUIC Feedback not implemented for UDP
+		cancel := h.src.MakeSrc(ps, ps.feedback) // nil: QUIC Feedback not implemented for UDP
 		ps.cancelFn = cancel
 		h.sessions[addr.String()] = ps
 		return nil

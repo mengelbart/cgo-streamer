@@ -8,14 +8,12 @@ import (
 )
 
 type DatagramHandler struct {
-	src    SrcFactory
-	tracer *QUICTracer
+	src SrcFactory
 }
 
-func NewDatagramHandler(src SrcFactory, tracer *QUICTracer) *DatagramHandler {
+func NewDatagramHandler(src SrcFactory) *DatagramHandler {
 	return &DatagramHandler{
-		src:    src,
-		tracer: tracer,
+		src: src,
 	}
 }
 
@@ -30,7 +28,7 @@ func (d *DatagramHandler) handle(session quic.Session) error {
 
 	go ds.AcceptFeedback()
 
-	cancel := d.src.MakeSrc(ds, ds.feedback, d.tracer.getACKChan())
+	cancel := d.src.MakeSrc(ds, ds.feedback)
 	defer cancel()
 
 	var err error

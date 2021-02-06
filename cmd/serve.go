@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/lucas-clemente/quic-go/qlog"
+
 	"github.com/mengelbart/cgo-streamer/util"
 
 	"github.com/lucas-clemente/quic-go/logging"
@@ -71,9 +73,20 @@ func serve() error {
 
 	var runner Runner
 	var options []func(*transport.QUICServer)
-	var tracer *transport.QUICTracer
+	var tracers []logging.Tracer
 	if len(QLOGFile) > 0 {
-		tracer = transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+		// add qlog tracer
+		tracers = append(tracers, qlog.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
+			f, err := os.Create(QLOGFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("Creating qlog file %s.\n", QLOGFile)
+			return util.NewBufferedWriteCloser(bufio.NewWriter(f), f)
+		}))
+	}
+	if FeedbackAlgorithm > 0 {
+		t := transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
 			f, err := os.Create(QLOGFile)
 			if err != nil {
 				log.Fatal(err)
@@ -81,13 +94,16 @@ func serve() error {
 			log.Printf("Creating qlog file %s.\n", QLOGFile)
 			return util.NewBufferedWriteCloser(bufio.NewWriter(f), f)
 		})
-		options = append(options, transport.SetQLOGTracer(tracer))
-	} else {
-		tracer = transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
-			return nopCloser{}
-		})
+		tracers = append(tracers, t)
+		src.ackChan = t.GetACKChan()
+	}
+
+	var tracer logging.Tracer
+	if len(tracers) > 0 {
+		tracer = logging.NewMultiplexedTracer(tracers...)
 		options = append(options, transport.SetQLOGTracer(tracer))
 	}
+
 	switch Handler {
 	case "udp":
 		runner = transport.NewUDPServer(Addr, transport.SetPacketHandler(transport.NewUDPPacketHandler(src)))
@@ -99,7 +115,7 @@ func serve() error {
 		}
 		runner = s
 	case "datagram":
-		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src, tracer)))
+		options = append(options, transport.SetSessionHandler(transport.NewDatagramHandler(src)))
 		options = append(options, transport.SetDatagramEnabled(true))
 		fallthrough
 	default:
@@ -119,11 +135,12 @@ type Src struct {
 	ScreamLogWriter  io.Writer
 	videoSrc         string
 	bitrate          int
+	ackChan          <-chan []*transport.Packet
 }
 
-func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte, ack <-chan []*transport.Packet) func() {
+func (s *Src) MakeSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	if s.scream {
-		return s.MakeScreamSrc(w, fb, ack)
+		return s.MakeScreamSrc(w, fb)
 	}
 	return s.MakeSimpleSrc(w, fb)
 }
@@ -146,9 +163,9 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	}
 }
 
-func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte, ack <-chan []*transport.Packet) func() {
+func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	ssrc := uint(1)
-	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, ack, s.ScreamLogWriter)
+	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, s.ScreamLogWriter)
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
@@ -156,21 +173,17 @@ func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte, ack <-chan []*tr
 		cc.SetKeyFrameRequester(p.ForceKeyFrame)
 	}
 	p.Start()
-	go cc.Run2()
+
+	if FeedbackAlgorithm > 0 {
+		go cc.RunInferFeedback(s.ackChan)
+	} else {
+		go cc.RunReceiveFeedback()
+	}
+
 	go cc.RunBitrate(p.SetBitRate)
 
 	return func() {
 		p.Stop()
 		p.Destroy()
 	}
-}
-
-type nopCloser struct{}
-
-func (n2 nopCloser) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
-func (n2 nopCloser) Close() error {
-	return nil
 }

@@ -28,6 +28,8 @@ type ScreamSendWriter struct {
 	done            chan struct{}
 	screamLogWriter io.Writer
 	requestKeyFrame func()
+
+	inferReceiveTime inferReceiveTimeFn
 }
 
 type Feedback struct {
@@ -41,24 +43,34 @@ func (s *ScreamSendWriter) Close() error {
 	return nil
 }
 
-func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte, ack <-chan []*Packet, screamLogWriter io.Writer) *ScreamSendWriter {
+func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte, screamLogWriter io.Writer) *ScreamSendWriter {
 	queue := NewQueue()
 	screamTx := scream.NewTx()
 	screamTx.RegisterNewStream(queue, ssrc, 1, 1000, float64(bitrate*1000), 2048000000)
 	screamRx := scream.NewRx(ssrc)
 
 	return &ScreamSendWriter{
-		w:               w,
-		q:               queue,
-		screamTx:        screamTx,
-		screamRx:        screamRx,
-		ssrc:            ssrc,
-		packet:          make(chan *rtp.Packet, 1024),
-		done:            make(chan struct{}, 1),
-		feedback:        fb,
-		ack:             ack,
-		screamLogWriter: screamLogWriter,
+		w:                w,
+		q:                queue,
+		screamTx:         screamTx,
+		screamRx:         screamRx,
+		ssrc:             ssrc,
+		packet:           make(chan *rtp.Packet, 1024),
+		done:             make(chan struct{}, 1),
+		feedback:         fb,
+		screamLogWriter:  screamLogWriter,
+		inferReceiveTime: StaticReceiveTime,
 	}
+}
+
+type inferReceiveTimeFn func(p *Packet, ts uint32) uint32
+
+func StaticReceiveTime(p *Packet, ts uint32) uint32 {
+	return uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000)))
+}
+
+func (s *ScreamSendWriter) SetReceiveTimeInferFn(fn inferReceiveTimeFn) {
+	s.inferReceiveTime = fn
 }
 
 func (s *ScreamSendWriter) SetKeyFrameRequester(requestKeyFrame func()) {
@@ -110,7 +122,7 @@ func (s ScreamSendWriter) RunBitrate(setBitrate func(uint)) {
 	}
 }
 
-func (s *ScreamSendWriter) Run() {
+func (s *ScreamSendWriter) RunReceiveFeedback() {
 	gst.InitT0()
 	for {
 		//fmt.Printf("len(q)=%v, delay: %v\n", s.q.Len(), s.q.GetDelay(float64(gst.GetTimeInNTP())/65536))
@@ -166,7 +178,7 @@ func (s *ScreamSendWriter) Run() {
 			uint(item.Packet.SequenceNumber),
 			item.Packet.Marker,
 		)
-		log.Printf("%v: sent %v, got dT=%v\n", now, item.Packet.SequenceNumber, dT)
+		//log.Printf("%v: sent %v, got dT=%v\n", now, item.Packet.SequenceNumber, dT)
 		//log.Printf("transmitted seq nr: %v\n", item.Packet.SequenceNumber)
 	}
 }
@@ -180,7 +192,7 @@ type Packet struct {
 	quicPacketNr int64
 }
 
-func (s *ScreamSendWriter) Run2() {
+func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {
 
 	sentPackets := make(map[uint16]*Packet) // rtp sequencenumber -> packet
 	var nextReceiveCall []*Packet
@@ -197,7 +209,7 @@ func (s *ScreamSendWriter) Run2() {
 			})
 			s.screamTx.NewMediaFrame(uint(now), s.ssrc, len(packet.Raw))
 
-		case ack := <-s.ack:
+		case ack := <-ackChan:
 			for _, n := range ack {
 				nextReceiveCall = append(nextReceiveCall, sentPackets[n.rtpSeqNr])
 			}
@@ -211,7 +223,7 @@ func (s *ScreamSendWriter) Run2() {
 				nextReceiveCall = append(nextReceiveCall, p)
 			}
 			for _, p := range nextReceiveCall {
-				p.inferredTimestamp = uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000))) // TODO: Infer better timestamp from fb/ts
+				p.inferredTimestamp = s.inferReceiveTime(p, ts)
 				//log.Printf("%v got inferred Timestamp: %v\n", p.rtpSeqNr, p.inferredTimestamp)
 				s.screamRx.Receive(uint(p.inferredTimestamp), nil, 1, p.size, int(p.rtpSeqNr), 0)
 			}
@@ -308,7 +320,60 @@ func (s *ScreamReadWriter) Write(b []byte) (int, error) {
 	return s.w.Write(b)
 }
 
-func (s *ScreamReadWriter) Run(fbw io.Writer) {
+func (s *ScreamReadWriter) RunFullFeedback(fbw io.Writer) {
+	gst.InitT0()
+	ticker := time.NewTicker(s.feedbackFrequency)
+	defer ticker.Stop()
+	for {
+		select {
+		case p := <-s.packetChan:
+			s.screamRx.Receive(
+				uint(gst.GetTimeInNTP()),
+				nil,
+				int(p.SSRC),
+				len(p.Raw),
+				int(p.SequenceNumber),
+				0,
+			)
+			if s.sendImmediateFeedback {
+				if ok, feedback := s.screamRx.CreateStandardizedFeedback(
+					uint(gst.GetTimeInNTP()),
+					true,
+				); ok {
+					var ccf CCFeedback
+					err := ccf.UnmarshalBinary(feedback)
+					if err != nil {
+						log.Println(err)
+					}
+					log.Println(ccf.String())
+					_, err = fbw.Write(feedback)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
+		case <-ticker.C:
+			if ok, feedback := s.screamRx.CreateStandardizedFeedback(
+				uint(gst.GetTimeInNTP()),
+				true,
+			); ok {
+				var ccf CCFeedback
+				err := ccf.UnmarshalBinary(feedback)
+				if err != nil {
+					log.Println(err)
+				}
+				_, err = fbw.Write(feedback)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		case <-s.CloseChan:
+			return
+		}
+	}
+}
+
+func (s *ScreamReadWriter) RunMinimalFeedback(fbw io.Writer) {
 	gst.InitT0()
 	ticker := time.NewTicker(s.feedbackFrequency)
 	defer ticker.Stop()
@@ -320,46 +385,7 @@ func (s *ScreamReadWriter) Run(fbw io.Writer) {
 			lastSeqNr = p.SequenceNumber
 			lastTs = gst.GetTimeInNTP()
 			log.Printf("%v: received seqnr: %v\n", lastTs, p.SequenceNumber)
-		//s.screamRx.Receive(
-		//	uint(gst.GetTimeInNTP()),
-		//	nil,
-		//	int(p.SSRC),
-		//	len(p.Raw),
-		//	int(p.SequenceNumber),
-		//	0,
-		//)
-		//if s.sendImmediateFeedback {
-		//	if ok, feedback := s.screamRx.CreateStandardizedFeedback(
-		//		uint(gst.GetTimeInNTP()),
-		//		true,
-		//	); ok {
-		//		var ccf CCFeedback
-		//		err := ccf.UnmarshalBinary(feedback)
-		//		if err != nil {
-		//			log.Println(err)
-		//		}
-		//		log.Println(ccf.String())
-		//		_, err = fbw.Write(feedback)
-		//		if err != nil {
-		//			log.Println(err)
-		//		}
-		//	}
-		//}
 		case <-ticker.C:
-			//if ok, feedback := s.screamRx.CreateStandardizedFeedback(
-			//	uint(gst.GetTimeInNTP()),
-			//	true,
-			//); ok {
-			//	var ccf CCFeedback
-			//	err := ccf.UnmarshalBinary(feedback)
-			//	if err != nil {
-			//		log.Println(err)
-			//	}
-			//	_, err = fbw.Write(feedback)
-			//	if err != nil {
-			//		log.Println(err)
-			//	}
-			//}
 			err := s.sendFeedback(fbw, lastTs, lastSeqNr)
 			if err != nil {
 				log.Println(err)

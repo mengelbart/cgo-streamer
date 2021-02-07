@@ -17,12 +17,14 @@ import (
 )
 
 const (
-	Receive     FeedbackAlgorithm = "receive"
-	StaticDelay FeedbackAlgorithm = "static-delay"
+	Receive      FeedbackAlgorithm = "receive"
+	StaticDelay  FeedbackAlgorithm = "static-delay"
+	ACKTimestamp FeedbackAlgorithm = "ack-timestamp"
 )
 
 var fbas = map[FeedbackAlgorithm]InferReceiveTime{
-	StaticDelay: staticReceiveTime,
+	StaticDelay:  staticReceiveTime,
+	ACKTimestamp: ackTimestampReceiveTime,
 }
 
 type InferReceiveTime func(p *Packet, ts uint32) uint32
@@ -43,6 +45,11 @@ func (f FeedbackAlgorithm) getInferReceiveTimeFn() InferReceiveTime {
 
 func staticReceiveTime(p *Packet, ts uint32) uint32 {
 	return uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000)))
+}
+
+func ackTimestampReceiveTime(p *Packet, ts uint32) uint32 {
+	timeSinceAck := gst.GetTimeInNTP() - p.ackTimestamp
+	return ts - timeSinceAck
 }
 
 func (s *ScreamSendWriter) SetReceiveTimeInferFn(fn InferReceiveTimeFnFactory) {
@@ -213,6 +220,7 @@ type Packet struct {
 	size              int
 
 	quicPacketNr int64
+	ackTimestamp uint32
 }
 
 func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {

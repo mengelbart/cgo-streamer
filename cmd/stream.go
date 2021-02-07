@@ -70,7 +70,7 @@ func run() error {
 			return err
 		}
 		defer cancel()
-		if FeedbackAlgorithm > 0 {
+		if transport.FeedbackAlgorithm(FeedbackAlgorithm) != transport.Receive {
 			go screamWriter.RunMinimalFeedback(writer)
 		} else {
 			go screamWriter.RunFullFeedback(writer)

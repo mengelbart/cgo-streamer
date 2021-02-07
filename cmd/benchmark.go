@@ -66,6 +66,7 @@ var feedbackFrequencies = []time.Duration{
 }
 var feedbackAlgorithms = []transport.FeedbackAlgorithm{
 	transport.StaticDelay,
+	transport.ACKTimestamp,
 }
 
 func runBenchmark() error {

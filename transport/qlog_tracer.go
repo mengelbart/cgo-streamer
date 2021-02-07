@@ -6,6 +6,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/mengelbart/cgo-streamer/gst"
+
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/pion/rtp"
 )
@@ -73,7 +75,10 @@ func (c *ConnectionTracer) ReceivedPacket(hdr *logging.ExtendedHeader, size logg
 			var acks []*Packet
 			for _, r := range v.AckRanges {
 				for i := r.Smallest; i <= r.Largest; i++ {
-					acks = append(acks, c.packets[int64(i)]...)
+					for _, p := range c.packets[int64(i)] {
+						p.ackTimestamp = gst.GetTimeInNTP()
+						acks = append(acks, p)
+					}
 					delete(c.packets, int64(i))
 				}
 			}

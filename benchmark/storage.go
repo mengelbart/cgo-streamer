@@ -39,6 +39,7 @@ type document struct {
 	CongestionControl string        `json:"congestion_control" firestore:"congestion_control"`
 	Handler           string        `json:"handler" firestore:"handler"`
 	FeedbackFrequency time.Duration `json:"feedback_frequency" firestore:"feedback_frequency"`
+	FeedbackAlgorithm string        `json:"feedback_algorithm" firestore:"feedback_algorithm"`
 	RequestKeyFrames  bool          `json:"request_key_frames" firestore:"request_key_frames"`
 	Iperf             bool          `json:"iperf" firestore:"iperf"`
 
@@ -125,6 +126,7 @@ func (u *uploader) Upload(path string) error {
 		CongestionControl:        e.CongestionControl,
 		Handler:                  e.Handler,
 		FeedbackFrequency:        e.FeedbackFrequency,
+		FeedbackAlgorithm:        e.FeedbackAlgorithm.String(),
 		RequestKeyFrames:         e.RequestKeyFrames,
 		Iperf:                    e.Iperf,
 		ServeCMD:                 e.ServeCMD,

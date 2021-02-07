@@ -85,7 +85,7 @@ func serve() error {
 			return util.NewBufferedWriteCloser(bufio.NewWriter(f), f)
 		}))
 	}
-	if FeedbackAlgorithm > 0 {
+	if transport.FeedbackAlgorithm(FeedbackAlgorithm) != transport.Receive {
 		t := transport.NewTracer(func(_ logging.Perspective, connID []byte) io.WriteCloser {
 			f, err := os.Create(QLOGFile)
 			if err != nil {
@@ -166,6 +166,7 @@ func (s *Src) MakeSimpleSrc(w io.WriteCloser, fb <-chan []byte) func() {
 func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	ssrc := uint(1)
 	cc := transport.NewScreamWriter(ssrc, s.bitrate, w, fb, s.ScreamLogWriter)
+	cc.SetReceiveTimeInferFn(transport.FeedbackAlgorithm(FeedbackAlgorithm))
 
 	p := gst.NewSrcPipeline(cc, s.videoSrc, s.bitrate)
 	p.SetSSRC(ssrc)
@@ -174,7 +175,7 @@ func (s *Src) MakeScreamSrc(w io.WriteCloser, fb <-chan []byte) func() {
 	}
 	p.Start()
 
-	if FeedbackAlgorithm > 0 {
+	if transport.FeedbackAlgorithm(FeedbackAlgorithm) != transport.Receive {
 		go cc.RunInferFeedback(s.ackChan)
 	} else {
 		go cc.RunReceiveFeedback()

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mengelbart/cgo-streamer/transport"
+
 	"gonum.org/v1/gonum/stat/combin"
 )
 
@@ -24,17 +26,17 @@ const (
 )
 
 type experiment struct {
-	ID                string        `json:"id"`
-	Filename          string        `json:"filename"`
-	AbsFile           string        `json:"absolute_filename"`
-	BaseFile          string        `json:"base_filename"`
-	Bandwidth         Bitrate       `json:"bandwidth"`
-	CongestionControl string        `json:"congestion_control"`
-	Handler           string        `json:"handler"`
-	FeedbackFrequency time.Duration `json:"feedback_frequency"`
-	RequestKeyFrames  bool          `json:"request_key_frames"`
-	Iperf             bool          `json:"iperf"`
-	FeedbackAlgorithm int           `json:"feedback_algorithm"`
+	ID                string                      `json:"id"`
+	Filename          string                      `json:"filename"`
+	AbsFile           string                      `json:"absolute_filename"`
+	BaseFile          string                      `json:"base_filename"`
+	Bandwidth         Bitrate                     `json:"bandwidth"`
+	CongestionControl string                      `json:"congestion_control"`
+	Handler           string                      `json:"handler"`
+	FeedbackFrequency time.Duration               `json:"feedback_frequency"`
+	RequestKeyFrames  bool                        `json:"request_key_frames"`
+	Iperf             bool                        `json:"iperf"`
+	FeedbackAlgorithm transport.FeedbackAlgorithm `json:"feedback_algorithm"`
 
 	ServeCMD  string `json:"server_cmd"`
 	StreamCMD string `json:"client_cmd"`
@@ -459,7 +461,7 @@ type Evaluator struct {
 	FeedbackFrequencies   []time.Duration
 	RequestKeyFrames      []bool
 	Iperf                 []bool
-	FeedbackAlgorithms    []int
+	FeedbackAlgorithms    []transport.FeedbackAlgorithm
 }
 
 func (e *Evaluator) buildExperiments() []*experiment {
@@ -492,7 +494,7 @@ func (e *Evaluator) buildExperiments() []*experiment {
 			continue
 		}
 		// filter inferred feedback for non-datagram handlers
-		if c.FeedbackAlgorithm != 0 && (c.CongestionControl != "scream" || c.Handler != "datagram") {
+		if len(c.FeedbackAlgorithm) > 0 && (c.CongestionControl != "scream" || c.Handler != "datagram") {
 			continue
 		}
 		experiments = append(experiments, c)

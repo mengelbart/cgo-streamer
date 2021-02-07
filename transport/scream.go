@@ -16,6 +16,43 @@ import (
 	"github.com/pion/rtp"
 )
 
+const (
+	Receive     FeedbackAlgorithm = "receive"
+	StaticDelay FeedbackAlgorithm = "static-delay"
+)
+
+var fbas = map[FeedbackAlgorithm]InferReceiveTime{
+	StaticDelay: staticReceiveTime,
+}
+
+type InferReceiveTime func(p *Packet, ts uint32) uint32
+
+type InferReceiveTimeFnFactory interface {
+	getInferReceiveTimeFn() InferReceiveTime
+}
+
+type FeedbackAlgorithm string
+
+func (f FeedbackAlgorithm) String() string {
+	return string(f)
+}
+
+func (f FeedbackAlgorithm) getInferReceiveTimeFn() InferReceiveTime {
+	return fbas[f]
+}
+
+func staticReceiveTime(p *Packet, ts uint32) uint32 {
+	return uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000)))
+}
+
+func (s *ScreamSendWriter) SetReceiveTimeInferFn(fn InferReceiveTimeFnFactory) {
+	s.inferReceiveTime = fn.getInferReceiveTimeFn()
+}
+
+func (s *ScreamSendWriter) SetKeyFrameRequester(requestKeyFrame func()) {
+	s.requestKeyFrame = requestKeyFrame
+}
+
 type ScreamSendWriter struct {
 	w               io.WriteCloser
 	q               *Queue
@@ -29,7 +66,7 @@ type ScreamSendWriter struct {
 	screamLogWriter io.Writer
 	requestKeyFrame func()
 
-	inferReceiveTime inferReceiveTimeFn
+	inferReceiveTime InferReceiveTime
 }
 
 type Feedback struct {
@@ -59,22 +96,8 @@ func NewScreamWriter(ssrc uint, bitrate int, w io.WriteCloser, fb <-chan []byte,
 		done:             make(chan struct{}, 1),
 		feedback:         fb,
 		screamLogWriter:  screamLogWriter,
-		inferReceiveTime: StaticReceiveTime,
+		inferReceiveTime: staticReceiveTime,
 	}
-}
-
-type inferReceiveTimeFn func(p *Packet, ts uint32) uint32
-
-func StaticReceiveTime(p *Packet, ts uint32) uint32 {
-	return uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000)))
-}
-
-func (s *ScreamSendWriter) SetReceiveTimeInferFn(fn inferReceiveTimeFn) {
-	s.inferReceiveTime = fn
-}
-
-func (s *ScreamSendWriter) SetKeyFrameRequester(requestKeyFrame func()) {
-	s.requestKeyFrame = requestKeyFrame
 }
 
 func (s *ScreamSendWriter) Write(b []byte) (int, error) {

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mengelbart/cgo-streamer/transport"
+
 	"github.com/mengelbart/cgo-streamer/benchmark"
 
 	"github.com/spf13/cobra"
@@ -62,9 +64,8 @@ var feedbackFrequencies = []time.Duration{
 	20 * time.Millisecond,
 	100 * time.Millisecond,
 }
-var feedbackAlgorithms = []int{
-	0,
-	1,
+var feedbackAlgorithms = []transport.FeedbackAlgorithm{
+	transport.StaticDelay,
 }
 
 func runBenchmark() error {
@@ -75,7 +76,7 @@ func runBenchmark() error {
 		CongestionControllers: congestionControllers,
 		Handlers:              handlers,
 		FeedbackFrequencies:   feedbackFrequencies,
-		RequestKeyFrames:      []bool{false, true},
+		RequestKeyFrames:      []bool{false}, //, true},
 		Iperf:                 []bool{false, true},
 		FeedbackAlgorithms:    feedbackAlgorithms,
 	}

@@ -65,6 +65,7 @@ var feedbackFrequencies = []time.Duration{
 	100 * time.Millisecond,
 }
 var feedbackAlgorithms = []transport.FeedbackAlgorithm{
+	transport.Receive,
 	transport.StaticDelay,
 	transport.ACKTimestamp,
 	transport.RTTArrival,

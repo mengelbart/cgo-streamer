@@ -447,7 +447,7 @@ func setBandwidth(b Bitrate) error {
 			"-n", fmt.Sprintf("ns%v", i),
 			"qdisc", "add",
 			"dev", fmt.Sprintf("veth%v", i),
-			"parent", "1:", "handle:", "2:",
+			"parent", "1:", "handle", "2:",
 			"tbf", "rate", fmt.Sprintf("%v", b), "latency", "400ms", "burst", "20kB")
 		fmt.Printf("%v %v\n", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
@@ -519,7 +519,7 @@ func (e *Evaluator) buildExperiments() []*experiment {
 			continue
 		}
 		// filter inferred feedback for non-datagram handlers
-		if len(c.FeedbackAlgorithm) > 0 && (c.CongestionControl != "scream" || c.Handler != "datagram") {
+		if c.FeedbackAlgorithm != transport.Receive && (c.CongestionControl != "scream" || c.Handler != "datagram") {
 			continue
 		}
 		experiments = append(experiments, c)

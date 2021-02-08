@@ -423,11 +423,36 @@ func (e *experiment) Run() error {
 func setBandwidth(b Bitrate) error {
 	var err error
 	for i := 1; i <= 2; i++ {
-		tc := exec.Command("tc", "-n", fmt.Sprintf("ns%v", i), "qdisc", "add", "dev", fmt.Sprintf("veth%v", i), "root", "tbf", "rate", fmt.Sprintf("%v", b), "limit", "100kB", "burst", "100kB")
+		// add delay
+		tcDelay := exec.Command(
+			"tc",
+			"-n", fmt.Sprintf("ns%v", i),
+			"qdisc",
+			"add",
+			"dev", fmt.Sprintf("veth%v", i),
+			"root", "handle", "1:",
+			"netem", "delay", "10ms",
+		)
+		fmt.Printf("%v %v\n", tcDelay.Path, tcDelay.Args)
+		tcDelay.Stdout = os.Stdout
+		tcDelay.Stderr = os.Stderr
+		err1 := tcDelay.Run()
+		if err1 != nil {
+			fmt.Printf("tc add delay for ns%v returned error: %v\n", i, err)
+			err = fmt.Errorf("%v, %v", err, err1)
+		}
+
+		tc := exec.Command(
+			"tc",
+			"-n", fmt.Sprintf("ns%v", i),
+			"qdisc", "add",
+			"dev", fmt.Sprintf("veth%v", i),
+			"parent", "1:", "handle:", "2:",
+			"tbf", "rate", fmt.Sprintf("%v", b), "latency", "400ms", "burst", "20kB")
 		fmt.Printf("%v %v\n", tc.Path, tc.Args)
 		tc.Stdout = os.Stdout
 		tc.Stderr = os.Stderr
-		err1 := tc.Run()
+		err1 = tc.Run()
 		if err1 != nil {
 			fmt.Printf("tc add for ns%v returned error: %v\n", i, err)
 			err = fmt.Errorf("%v, %v", err, err1)

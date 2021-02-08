@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -75,7 +76,10 @@ func (c *QUICClient) RunFeedbackSender() (io.Writer, chan<- struct{}, error) {
 	var fbStream quic.SendStream
 	if c.dgram {
 		fbSender = func(fb []byte) error {
-			return c.session.SendMessage(fb)
+			if c.session != nil {
+				return c.session.SendMessage(fb)
+			}
+			return errors.New("no active session")
 		}
 	} else {
 		fbSender = func(fb []byte) error {

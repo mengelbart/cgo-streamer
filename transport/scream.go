@@ -20,11 +20,13 @@ const (
 	Receive      FeedbackAlgorithm = "receive"
 	StaticDelay  FeedbackAlgorithm = "static-delay"
 	ACKTimestamp FeedbackAlgorithm = "ack-timestamp"
+	RTTArrival   FeedbackAlgorithm = "rtt"
 )
 
 var fbas = map[FeedbackAlgorithm]InferReceiveTime{
 	StaticDelay:  staticReceiveTime,
 	ACKTimestamp: ackTimestampReceiveTime,
+	RTTArrival:   rttReceiveTime,
 }
 
 type InferReceiveTime func(p *Packet, ts uint32) uint32
@@ -43,13 +45,29 @@ func (f FeedbackAlgorithm) getInferReceiveTimeFn() InferReceiveTime {
 	return fbas[f]
 }
 
+func minMax(min, max, t uint32) uint32 {
+	if t < min {
+		return min
+	}
+	if t > max {
+		return max
+	}
+	return t
+}
+
 func staticReceiveTime(p *Packet, ts uint32) uint32 {
-	return uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000)))
+	return minMax(p.sentTimestamp, ts, uint32(math.Min(float64(ts-100), float64(p.sentTimestamp+1000))))
 }
 
 func ackTimestampReceiveTime(p *Packet, ts uint32) uint32 {
 	timeSinceAck := gst.GetTimeInNTP() - p.ackTimestamp
-	return ts - timeSinceAck
+	return minMax(p.sentTimestamp, ts, ts-timeSinceAck)
+}
+
+func rttReceiveTime(p *Packet, ts uint32) uint32 {
+	log.Printf("smoothedRTT: %v, p.sentTimestamp: %v, ts: %v\n", p.smoothedRTT, p.sentTimestamp, ts)
+	rttNTP := p.smoothedRTT * 65536
+	return minMax(p.sentTimestamp, ts, uint32(int64(p.sentTimestamp)+int64(rttNTP)/2))
 }
 
 func (s *ScreamSendWriter) SetReceiveTimeInferFn(fn InferReceiveTimeFnFactory) {
@@ -221,12 +239,14 @@ type Packet struct {
 
 	quicPacketNr int64
 	ackTimestamp uint32
+	smoothedRTT  float64
 }
 
 func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {
 
 	sentPackets := make(map[uint16]*Packet) // rtp sequencenumber -> packet
 	var nextReceiveCall []*Packet
+	var lastSeenSmoothedRTT float64
 
 	gst.InitT0()
 	for {
@@ -242,6 +262,9 @@ func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {
 
 		case ack := <-ackChan:
 			for _, n := range ack {
+				sentPackets[n.rtpSeqNr].ackTimestamp = n.ackTimestamp
+				sentPackets[n.rtpSeqNr].smoothedRTT = n.smoothedRTT
+				lastSeenSmoothedRTT = n.smoothedRTT
 				nextReceiveCall = append(nextReceiveCall, sentPackets[n.rtpSeqNr])
 			}
 
@@ -251,11 +274,13 @@ func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {
 			//log.Printf("TIMESTAMP: %v\n", ts)
 
 			if p, ok := sentPackets[snr]; ok {
+				p.ackTimestamp = ts
+				p.smoothedRTT = lastSeenSmoothedRTT
 				nextReceiveCall = append(nextReceiveCall, p)
 			}
 			for _, p := range nextReceiveCall {
 				p.inferredTimestamp = s.inferReceiveTime(p, ts)
-				//log.Printf("%v got inferred Timestamp: %v\n", p.rtpSeqNr, p.inferredTimestamp)
+				log.Printf("seqNr: %v, sent at %v, got inferred Timestamp: %v, diff:=%v\n", p.rtpSeqNr, p.sentTimestamp, p.inferredTimestamp, p.inferredTimestamp-p.sentTimestamp)
 				s.screamRx.Receive(uint(p.inferredTimestamp), nil, 1, p.size, int(p.rtpSeqNr), 0)
 			}
 			nextReceiveCall = []*Packet{}

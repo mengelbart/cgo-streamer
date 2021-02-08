@@ -43,7 +43,8 @@ func (q QUICTracer) DroppedPacket(addr net.Addr, packetType logging.PacketType, 
 type ConnectionTracer struct {
 	ack chan []*Packet
 
-	packets map[int64][]*Packet
+	packets      map[int64][]*Packet
+	lastRTTStats *logging.RTTStats
 }
 
 func (c *ConnectionTracer) SentPacket(hdr *logging.ExtendedHeader, size logging.ByteCount, ack *logging.AckFrame, frames []logging.Frame) {
@@ -75,9 +76,12 @@ func (c *ConnectionTracer) ReceivedPacket(hdr *logging.ExtendedHeader, size logg
 			var acks []*Packet
 			for _, r := range v.AckRanges {
 				for i := r.Smallest; i <= r.Largest; i++ {
-					for _, p := range c.packets[int64(i)] {
-						p.ackTimestamp = gst.GetTimeInNTP()
-						acks = append(acks, p)
+					for j := range c.packets[int64(i)] {
+						c.packets[int64(i)][j].ackTimestamp = gst.GetTimeInNTP()
+						if c.lastRTTStats != nil {
+							c.packets[int64(i)][j].smoothedRTT = c.lastRTTStats.SmoothedRTT().Seconds()
+						}
+						acks = append(acks, c.packets[int64(i)][j])
 					}
 					delete(c.packets, int64(i))
 				}
@@ -113,7 +117,10 @@ func (c ConnectionTracer) BufferedPacket(packetType logging.PacketType) {
 func (c ConnectionTracer) DroppedPacket(packetType logging.PacketType, count logging.ByteCount, reason logging.PacketDropReason) {
 }
 
-func (c ConnectionTracer) UpdatedMetrics(rttStats *logging.RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) {
+func (c *ConnectionTracer) UpdatedMetrics(rttStats *logging.RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) {
+	if rttStats.SmoothedRTT() != 0 {
+		c.lastRTTStats = rttStats
+	}
 }
 
 func (c ConnectionTracer) LostPacket(level logging.EncryptionLevel, number logging.PacketNumber, reason logging.PacketLossReason) {

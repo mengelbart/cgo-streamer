@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -27,13 +28,16 @@ func init() {
 		&FeedbackAlgorithm,
 		"feedback-algorithm",
 		"receive",
-		string(`Choose an algorithm to generate SCReAM feedback:`+
-			transport.Receive+`receive: Send normal feedback from receiver to sender (default)`+
-			transport.StaticDelay+`: Infer feedback using static interval`))
+		fmt.Sprintf("Choose an algorithm to generate SCReAM feedback: \n"+
+			"%v: Send normal feedback from receiver to sender (default)\n"+
+			"%v: Infer feedback using static interval\n"+
+			"%v: Infer feedback QUIC ACK timestamp\n"+
+			"%v: Infer feedback from sent timestamp and current smoothed RTT",
+			transport.Receive, transport.StaticDelay, transport.ACKTimestamp, transport.RTTArrival))
 }
 
 var rootCmd = &cobra.Command{
-	Use: "qst",
+	Use: "qrt",
 }
 
 func Execute() {

@@ -218,7 +218,7 @@ func (s *ScreamSendWriter) RunReceiveFeedback() {
 			log.Println(err)
 		}
 		//log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
-		now := gst.GetTimeInNTP() // TODO: This timestamp should be used in qlog_tracer!
+		now := gst.GetTimeInNTP()
 		dT = s.screamTx.AddTransmitted(
 			uint(now),
 			uint(item.Packet.SSRC),
@@ -329,7 +329,7 @@ func (s *ScreamSendWriter) RunInferFeedback(ackChan <-chan []*Packet) {
 			log.Println(err)
 		}
 		//log.Printf("packet of %v bytes written from scream queue, len(queue)=%v", n, s.q.Len())
-		now := gst.GetTimeInNTP() // TODO: This timestamp should be used in qlog_tracer!
+		now := gst.GetTimeInNTP()
 		dT = s.screamTx.AddTransmitted(
 			uint(now),
 			uint(item.Packet.SSRC),

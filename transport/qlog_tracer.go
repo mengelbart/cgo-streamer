@@ -93,6 +93,9 @@ func (c *ConnectionTracer) ReceivedPacket(hdr *logging.ExtendedHeader, size logg
 	}
 }
 
+func (c *ConnectionTracer) RestoredTransportParameters(parameters *logging.TransportParameters) {
+}
+
 func (c ConnectionTracer) ReceivedVersionNegotiationPacket(header *logging.Header, numbers []logging.VersionNumber) {
 }
 
